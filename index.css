@@ -1,0 +1,9 @@
+/* בסיס מינימלי כדי למנוע שגיאת 404 על index.css.
+   רוב העיצוב מגיע מ-styled-components בתוך האפליקציה. */
+
+html, body {
+  margin: 0;
+  padding: 0;
+}
+
+

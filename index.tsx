@@ -2271,6 +2271,10 @@ const ai = new GoogleGenAI({ apiKey });
       alert('אין הרשאה. נא להתחבר או לבדוק את החבילה שלך.');
       return;
     }
+    // אם כבר במצב "3 המובילים", לא צריך לעשות כלום
+    if (isTop3()) {
+      return;
+    }
     const maxExperts = planAccess.maxExperts;
     const top3 = currentExpertsList.slice(0, Math.min(3, maxExperts)).map(e => e.title);
     setSelectedExperts(top3);
@@ -2286,6 +2290,10 @@ const ai = new GoogleGenAI({ apiKey });
     if (maxExperts <= 3) {
       return; // לא עושה כלום בחבילת ניסיון
     }
+    // אם כבר במצב "כל המומחים", לא צריך לעשות כלום
+    if (isAll()) {
+      return;
+    }
     // בחבילת יוצרים ויוצרים באקסטרים - כל 8 המומחים
     const all = currentExpertsList.slice(0, maxExperts).map(e => e.title);
     setSelectedExperts(all);
@@ -2295,16 +2303,20 @@ const ai = new GoogleGenAI({ apiKey });
     if (!planAccess) return false;
     const maxExperts = planAccess.maxExperts;
     const top3 = currentExpertsList.slice(0, Math.min(3, maxExperts)).map(e => e.title);
-    return selectedExperts.length === top3.length && 
-           selectedExperts.every((exp, i) => exp === top3[i]);
+    // בדוק אם כל המומחים שנבחרו הם בדיוק 3 המובילים
+    if (selectedExperts.length !== top3.length) return false;
+    return top3.every(exp => selectedExperts.includes(exp));
   };
 
   const isAll = () => {
     if (!planAccess) return false;
     const maxExperts = planAccess.maxExperts;
+    // בחבילת ניסיון - לא יכול להיות במצב "כל המומחים"
+    if (maxExperts <= 3) return false;
     const all = currentExpertsList.slice(0, maxExperts).map(e => e.title);
-    return selectedExperts.length === all.length && 
-           selectedExperts.every((exp, i) => exp === all[i]);
+    // בדוק אם כל המומחים שנבחרו הם בדיוק כל המומחים
+    if (selectedExperts.length !== all.length) return false;
+    return all.every(exp => selectedExperts.includes(exp));
   };
 
   if (checkingAuth) {
@@ -2426,15 +2438,25 @@ const ai = new GoogleGenAI({ apiKey });
            <ExpertToggleGroup>
               <ExpertToggleButton 
                 $active={isTop3()} 
-                onClick={handleSetTop3}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleSetTop3();
+                }}
                 disabled={!planAccess}
+                type="button"
               >
                 3 המובילים
               </ExpertToggleButton>
               <ExpertToggleButton 
                 $active={isAll()} 
-                onClick={handleSetAll}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleSetAll();
+                }}
                 disabled={!planAccess || (planAccess?.maxExperts || 0) <= 3}
+                type="button"
               >
                 {planAccess && planAccess.maxExperts > 3 ? 'כל המומחים' : `${planAccess?.maxExperts || 3} מומחים`}
               </ExpertToggleButton>

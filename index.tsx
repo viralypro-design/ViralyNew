@@ -2390,21 +2390,6 @@ const ai = new GoogleGenAI({ apiKey });
                   position: 'relative'
                 }}
               >
-                {isDisabled && !isActive && (
-                  <div style={{
-                    position: 'absolute',
-                    top: '5px',
-                    right: '5px',
-                    background: '#ff4d4d',
-                    color: '#fff',
-                    padding: '2px 8px',
-                    borderRadius: '4px',
-                    fontSize: '0.7rem',
-                    fontWeight: 700
-                  }}>
-                    🔒
-                  </div>
-                )}
                 {track.icon}
                 <span>{track.label}</span>
               </TrackCard>

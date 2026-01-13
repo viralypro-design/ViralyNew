@@ -1774,13 +1774,8 @@ const App = () => {
       return;
     }
     
-    // רק creators_extreme יכול לשנות תחום (maxTracks > 1)
-    // trial ו-creators מוגבלים לתחום אחד בלבד
-    if (planAccess.maxTracks <= 1 && activeTrack !== id) {
-      alert(`החבילה שלך מוגבלת לתחום אחד בלבד. שדרג ל"יוצרים באקסטרים" כדי לגשת לכל התחומים.`);
-      return;
-    }
-    
+    // כל החבילות יכולות לבחור תחום
+    // ההגבלה היא רק על מספר המומחים, לא על התחומים
     setActiveTrack(id as TrackId);
     setResult(null);
     setPreviousResult(null);
@@ -2374,12 +2369,8 @@ const ai = new GoogleGenAI({ apiKey });
         )}
         <Grid>
           {TRACKS.map((track, index) => {
-            // הגבל את מספר התחומים לפי החבילה
-            const maxTracks = planAccess?.maxTracks || 4;
-            // אם maxTracks = 1, רק התחום הראשון זמין (או התחום הנוכחי אם כבר נבחר)
-            const isDisabled = !planAccess || 
-              (maxTracks <= 1 && index > 0 && activeTrack !== track.id) || 
-              (maxTracks > 1 && index >= maxTracks);
+            // כל התחומים זמינים - ההגבלה היא רק על מספר המומחים
+            const isDisabled = !planAccess;
             const isActive = activeTrack === track.id;
             
             return (

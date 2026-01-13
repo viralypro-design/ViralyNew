@@ -427,7 +427,43 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
       if (signUpData?.user) {
         setSuccess('המשתמש נוצר בהצלחה! מתחבר...');
         
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // המתן שהטריגר יוצר את ה-subscription
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        
+        // בדוק אם יש subscription, אם לא - צור אותו ידנית
+        const { data: existingSubscription } = await supabase
+          .from('user_subscriptions')
+          .select('*')
+          .eq('user_id', signUpData.user.id)
+          .single();
+        
+        if (!existingSubscription) {
+          // אם אין subscription, צור אותו ידנית
+          const { error: subError } = await supabase
+            .from('user_subscriptions')
+            .insert({
+              user_id: signUpData.user.id,
+              plan_type: selectedPlan,
+              status: 'active',
+              minutes_used_monthly: 0,
+              analyses_used_monthly: 0
+            });
+          
+          if (subError) {
+            console.error('Error creating subscription:', subError);
+            // נמשיך גם אם יש שגיאה - אולי הטריגר יצר אותו
+          }
+        } else if (existingSubscription.plan_type !== selectedPlan) {
+          // אם יש subscription אבל עם חבילה אחרת, עדכן אותו
+          const { error: updateError } = await supabase
+            .from('user_subscriptions')
+            .update({ plan_type: selectedPlan })
+            .eq('user_id', signUpData.user.id);
+          
+          if (updateError) {
+            console.error('Error updating subscription:', updateError);
+          }
+        }
         
         const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
           email: email.trim().toLowerCase(),

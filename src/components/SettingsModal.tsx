@@ -267,7 +267,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, u
   return (
     <ModalOverlay onClick={onClose}>
       <ModalContent onClick={e => e.stopPropagation()}>
-        <CloseButton onClick={onClose}>✕</CloseButton>
+        <CloseButton 
+          onClick={(e) => {
+            e.stopPropagation();
+            onClose();
+          }}
+        >
+          ✕
+        </CloseButton>
         <ModalHeader>
           <h2>⚙️ הגדרות</h2>
         </ModalHeader>

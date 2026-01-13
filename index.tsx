@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { SignUpComponent } from '@/components/SignUpComponent';
 import { PlansInfoModal } from '@/components/PlansInfoModal';
 import { AuthModal } from '@/components/AuthModal';
+import { SettingsModal } from '@/components/SettingsModal';
 import { usePlanAccess } from '@/hooks/usePlanAccess';
 import { PLAN_CONFIG } from '@/config/planConfig';
 import { PlanType } from '@/types/subscription';
@@ -1746,6 +1747,7 @@ const App = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isPlansModalOpen, setIsPlansModalOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [modalTab, setModalTab] = useState('actors');
   const [user, setUser] = useState<any>(null);
   const [checkingAuth, setCheckingAuth] = useState(true);
@@ -2375,20 +2377,49 @@ const ai = new GoogleGenAI({ apiKey });
             סוכן על שמשלב ריאליטי, קולנוע, מוזיקה ומשפיענים.<br/>
             קבל ניתוח עומק, הערות מקצועיות וליווי עד לפריצה הגדולה.
           </Description>
+          {user && (
+            <div style={{ 
+              textAlign: 'center', 
+              margin: '15px 0',
+              padding: '10px 0'
+            }}>
+              <p style={{ color: '#D4A043', margin: '0 0 10px 0', fontSize: '0.95rem' }}>
+                מחובר כ: <strong style={{ color: '#e0e0e0' }}>{user.email}</strong>
+              </p>
+              <div style={{ 
+                display: 'flex', 
+                gap: '10px', 
+                justifyContent: 'center',
+                alignItems: 'center'
+              }}>
+                <LogoutButton 
+                  onClick={handleLogout}
+                  style={{ 
+                    padding: '8px 16px',
+                    fontSize: '0.85rem'
+                  }}
+                >
+                  🚪 התנתק
+                </LogoutButton>
+                <LogoutButton 
+                  onClick={() => setIsSettingsModalOpen(true)}
+                  style={{ 
+                    padding: '8px 16px',
+                    fontSize: '0.85rem'
+                  }}
+                >
+                  ⚙️ הגדרות
+                </LogoutButton>
+              </div>
+            </div>
+          )}
           <div style={{ 
             width: '200px', 
             height: '1px', 
             background: '#333', 
-            margin: '10px auto 30px auto'
+            margin: user ? '10px auto 30px auto' : '10px auto 40px auto'
           }}></div>
-          {user ? (
-            <UserInfo>
-              <p>מחובר כ: <strong>{user.email}</strong></p>
-              <LogoutButton onClick={handleLogout}>
-                🚪 התנתק
-              </LogoutButton>
-            </UserInfo>
-          ) : (
+          {!user && (
             <div style={{ textAlign: 'center', marginBottom: '40px' }}>
               <CTAButton onClick={() => setIsAuthModalOpen(true)}>
                 🔐 התחבר / הרשם
@@ -2443,6 +2474,14 @@ const ai = new GoogleGenAI({ apiKey });
             }, 500);
           }}
         />
+        
+        {user && (
+          <SettingsModal
+            isOpen={isSettingsModalOpen}
+            onClose={() => setIsSettingsModalOpen(false)}
+            userEmail={user.email}
+          />
+        )}
 
 
         <SectionLabel>בחר את מסלול הניתוח שלך:</SectionLabel>

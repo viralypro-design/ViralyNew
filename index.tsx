@@ -2446,7 +2446,7 @@ const ai = new GoogleGenAI({ apiKey });
                   e.stopPropagation();
                   handleSetTop3();
                 }}
-                disabled={!planAccess || (planAccess?.maxExperts || 0) <= 3}
+                disabled={!planAccess}
                 type="button"
               >
                 3 המובילים
@@ -2458,7 +2458,7 @@ const ai = new GoogleGenAI({ apiKey });
                   e.stopPropagation();
                   handleSetAll();
                 }}
-                disabled={!planAccess || (planAccess?.maxExperts || 0) <= 3}
+                disabled={!planAccess}
                 type="button"
               >
                 {planAccess && planAccess.maxExperts > 3 ? 'כל המומחים' : `${planAccess?.maxExperts || 3} מומחים`}

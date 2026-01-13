@@ -4,7 +4,7 @@ import styled, { createGlobalStyle, keyframes, css } from 'styled-components';
 import { GoogleGenAI } from "@google/genai";
 import { SubscriptionProvider } from '@/context/SubscriptionProvider';
 import { supabase } from '@/lib/supabaseClient';
-import { PlanTester } from '@/components/PlanTester';
+import { SimplePlanManager } from '@/components/SimplePlanManager';
 import './index.css';
 
 // --- Types ---
@@ -1722,24 +1722,19 @@ const App = () => {
   const pdfInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
 
-  // Check authentication on mount
+  // Listen to auth changes (but don't auto-check on mount)
   useEffect(() => {
-    const checkAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        setUser(session.user);
-      }
-      setCheckingAuth(false);
-    };
-    checkAuth();
-
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
         setUser(session.user);
       } else {
         setUser(null);
       }
+      setCheckingAuth(false);
     });
+
+    // Set initial state - no auto-check
+    setCheckingAuth(false);
 
     return () => {
       subscription.unsubscribe();
@@ -1754,6 +1749,14 @@ const App = () => {
   const handleLogout = async () => {
     await supabase.auth.signOut();
     setUser(null);
+    setCheckingAuth(false);
+    // Reset app state
+    setFile(null);
+    setPdfFile(null);
+    setPreviewUrl(null);
+    setResult(null);
+    setPreviousResult(null);
+    setIsImprovementMode(false);
   };
 
   const handleTrackChange = (id: string) => {
@@ -2235,7 +2238,7 @@ const ai = new GoogleGenAI({ apiKey });
         <GlobalStyle />
         <AppContainer>
           <div style={{ textAlign: 'center', color: '#D4A043', marginTop: '100px' }}>
-            בודק התחברות...
+            טוען...
           </div>
         </AppContainer>
       </>
@@ -2247,7 +2250,18 @@ const ai = new GoogleGenAI({ apiKey });
       <>
         <GlobalStyle />
         <AppContainer>
-          <LoginComponent onLogin={() => setCheckingAuth(true)} />
+          <LoginComponent onLogin={() => {
+            setCheckingAuth(true);
+            // Refresh after login
+            setTimeout(() => {
+              supabase.auth.getSession().then(({ data: { session } }) => {
+                if (session?.user) {
+                  setUser(session.user);
+                }
+                setCheckingAuth(false);
+              });
+            }, 500);
+          }} />
         </AppContainer>
       </>
     );
@@ -2267,7 +2281,9 @@ const ai = new GoogleGenAI({ apiKey });
           </Description>
           <UserInfo>
             <p>מחובר כ: <strong>{user.email}</strong></p>
-            <LogoutButton onClick={handleLogout}>התנתק</LogoutButton>
+            <LogoutButton onClick={handleLogout}>
+              🚪 התנתק
+            </LogoutButton>
           </UserInfo>
           <CTAButton onClick={() => document.getElementById('upload-section')?.scrollIntoView({ behavior: 'smooth' })}>
             העלה סרטון וקבל ניתוח מלא
@@ -2285,7 +2301,7 @@ const ai = new GoogleGenAI({ apiKey });
           setActiveTab={setModalTab}
         />
 
-        <PlanTester />
+        <SimplePlanManager />
 
         <SectionLabel>בחר את מסלול הניתוח שלך:</SectionLabel>
         <Grid>

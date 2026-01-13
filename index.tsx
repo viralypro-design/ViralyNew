@@ -1759,6 +1759,14 @@ const App = () => {
     setSelectedExperts(defaults);
   }, [activeTrack]);
 
+  // הגדר תחום ראשוני לפי החבילה
+  useEffect(() => {
+    if (planAccess && planAccess.maxTracks === 1 && activeTrack !== 'actors') {
+      // אם החבילה מוגבלת לתחום אחד, ודא שאנחנו בתחום הראשון
+      setActiveTrack('actors');
+    }
+  }, [planAccess]);
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     setUser(null);
@@ -1779,8 +1787,13 @@ const App = () => {
       return;
     }
     
-    // כל החבילות יכולות לבחור תחום
-    // ההגבלה היא רק על מספר המומחים, לא על התחומים
+    // רק יוצרים באקסטרים יכול לשנות תחום (maxTracks > 1)
+    // ניסיון ויוצרים מוגבלים לתחום אחד בלבד
+    if (planAccess.maxTracks <= 1 && activeTrack !== id) {
+      alert(`החבילה שלך מוגבלת לתחום אחד בלבד. שדרג ל"יוצרים באקסטרים" כדי לגשת לכל התחומים.`);
+      return;
+    }
+    
     setActiveTrack(id as TrackId);
     setResult(null);
     setPreviousResult(null);
@@ -2354,8 +2367,11 @@ const ai = new GoogleGenAI({ apiKey });
         )}
         <Grid>
           {TRACKS.map((track, index) => {
-            // כל התחומים זמינים - ההגבלה היא רק על מספר המומחים
-            const isDisabled = !planAccess;
+            const maxTracks = planAccess?.maxTracks || 4;
+            // אם maxTracks = 1, רק התחום הראשון זמין (או התחום הנוכחי אם כבר נבחר)
+            const isDisabled = !planAccess || 
+              (maxTracks <= 1 && index > 0 && activeTrack !== track.id) || 
+              (maxTracks > 1 && index >= maxTracks);
             const isActive = activeTrack === track.id;
             
             return (
@@ -2369,6 +2385,21 @@ const ai = new GoogleGenAI({ apiKey });
                   position: 'relative'
                 }}
               >
+                {isDisabled && !isActive && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '5px',
+                    right: '5px',
+                    background: '#ff4d4d',
+                    color: '#fff',
+                    padding: '2px 8px',
+                    borderRadius: '4px',
+                    fontSize: '0.7rem',
+                    fontWeight: 700
+                  }}>
+                    🔒
+                  </div>
+                )}
                 {track.icon}
                 <span>{track.label}</span>
               </TrackCard>
@@ -2392,10 +2423,18 @@ const ai = new GoogleGenAI({ apiKey });
              )}
            </ExpertControlText>
            <ExpertToggleGroup>
-              <ExpertToggleButton $active={isTop3()} onClick={handleSetTop3}>
+              <ExpertToggleButton 
+                $active={isTop3()} 
+                onClick={handleSetTop3}
+                disabled={!planAccess || (planAccess?.maxExperts || 0) <= 3}
+              >
                 3 המובילים
               </ExpertToggleButton>
-              <ExpertToggleButton $active={isAll()} onClick={handleSetAll}>
+              <ExpertToggleButton 
+                $active={isAll()} 
+                onClick={handleSetAll}
+                disabled={!planAccess || (planAccess?.maxExperts || 0) <= 3}
+              >
                 כל המומחים
               </ExpertToggleButton>
            </ExpertToggleGroup>

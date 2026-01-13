@@ -2454,12 +2454,37 @@ const ai = new GoogleGenAI({ apiKey });
         <Grid>
           {EXPERTS_BY_TRACK[activeTrack].map((expert, i) => {
             const isSelected = selectedExperts.includes(expert.title);
+            const maxExperts = planAccess?.maxExperts || 8;
+            // בחבילת ניסיון: אם יש כבר 3 מומחים ולא נבחר, לא ניתן לבחור
+            const canSelect = !isSelected && selectedExperts.length < maxExperts;
+            const isDisabled = !planAccess || (!isSelected && !canSelect);
+            
             return (
               <FeatureCard 
                 key={i} 
                 $selected={isSelected}
-                onClick={() => toggleExpert(expert.title)}
+                onClick={() => !isDisabled && toggleExpert(expert.title)}
+                style={{
+                  opacity: isDisabled ? 0.5 : 1,
+                  cursor: isDisabled ? 'not-allowed' : 'pointer',
+                  position: 'relative'
+                }}
               >
+                {isDisabled && !isSelected && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '5px',
+                    right: '5px',
+                    background: '#ff4d4d',
+                    color: '#fff',
+                    padding: '2px 8px',
+                    borderRadius: '4px',
+                    fontSize: '0.7rem',
+                    fontWeight: 700
+                  }}>
+                    🔒
+                  </div>
+                )}
                 <FeatureTitle $selected={isSelected}>{expert.title}</FeatureTitle>
                 <FeatureDesc>{expert.desc}</FeatureDesc>
               </FeatureCard>

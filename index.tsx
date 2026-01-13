@@ -2446,7 +2446,7 @@ const ai = new GoogleGenAI({ apiKey });
                   e.stopPropagation();
                   handleSetTop3();
                 }}
-                disabled={!planAccess}
+                disabled={!planAccess || (planAccess?.maxExperts || 0) <= 3}
                 type="button"
               >
                 3 המובילים

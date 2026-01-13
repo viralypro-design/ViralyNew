@@ -2489,6 +2489,20 @@ const ai = new GoogleGenAI({ apiKey });
 
 
         <SectionLabel>בחר את מסלול הניתוח שלך:</SectionLabel>
+        {!user && (
+          <div style={{ 
+            textAlign: 'center', 
+            marginBottom: '20px',
+            color: '#4CAF50',
+            fontSize: '0.95rem',
+            padding: '10px',
+            background: 'rgba(76, 175, 80, 0.1)',
+            border: '1px solid rgba(76, 175, 80, 0.3)',
+            borderRadius: '8px'
+          }}>
+            נא להתחבר או להירשם כדי להשתמש באפליקציה
+          </div>
+        )}
         {user && !planAccess && (
           <ErrorMsg style={{ textAlign: 'center', marginBottom: '20px' }}>
             אין הרשאה. נא לבדוק את החבילה שלך.

@@ -1754,7 +1754,7 @@ const App = () => {
   }, []);
 
   useEffect(() => {
-    // תמיד מתחיל עם 3 המובילים
+    // תמיד מתחיל עם 3 המובילים (ברירת מחדל)
     const defaults = EXPERTS_BY_TRACK[activeTrack].slice(0, 3).map(e => e.title);
     setSelectedExperts(defaults);
   }, [activeTrack]);

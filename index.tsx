@@ -2763,19 +2763,13 @@ const ai = new GoogleGenAI({ apiKey });
           >
             {loading ? 'צוות המומחים צופה כעת בסרטון' : (isImprovementMode ? 'נתח שיפורים' : 'אקשן !')}
           </ActionButton>
-          {!planAccess && (
-            <ErrorMsg>אין הרשאה להריץ ניתוח. נא להתחבר או לבדוק את החבילה שלך.</ErrorMsg>
-          )}
-          {!user && (
-            <ErrorMsg>נא להתחבר או להירשם כדי להריץ ניתוח</ErrorMsg>
-          )}
           {user && planAccess && !planAccess.canRunAnalysis() && (
             <ErrorMsg>הגעת למכסת הניתוחים החודשית. שדרג את החבילה להמשך.</ErrorMsg>
           )}
           {user && planAccess && !planAccess.hasMinutesLeft() && (
             <ErrorMsg>הגעת למכסת הדקות החודשית. שדרג את החבילה להמשך.</ErrorMsg>
           )}
-          {user && planAccess && selectedExperts.length < 3 && (
+          {selectedExperts.length < 3 && (
             <ErrorMsg>נא לבחור לפחות 3 מומחים כדי להמשיך</ErrorMsg>
           )}
         </InputWrapper>

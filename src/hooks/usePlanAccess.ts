@@ -9,7 +9,7 @@ import { FeatureKey, SubscriptionRow } from '@/types/subscription';
 export interface PlanAccess {
   readonly planLabel: string;
   readonly maxExperts: number; // מספר מקסימלי של מומחים שניתן לבחור
-  readonly maxDomains: number; // מספר מקסימלי של תחומים (tracks) זמינים
+  readonly maxTracks: number; // מספר מקסימלי של תחומים (tracks) זמינים
   readonly maxVideoMinutes: number; // אורך מקסימלי של סרטון בדקות
   readonly maxVideoMB: number; // גודל מקסימלי של סרטון ב-MB
   hasFeature(feature: FeatureKey): boolean;
@@ -52,8 +52,8 @@ export function usePlanAccess(subscription?: SubscriptionRow): PlanAccess | null
   // אין גישה ל-state חיצוני או localStorage
   return {
     planLabel: plan.label,
-    maxExperts: plan.allowedDomains, // allowedDomains = מספר מומחים מקסימלי
-    maxDomains: plan.allowedDomains, // allowedDomains = מספר תחומים מקסימלי
+    maxExperts: plan.maxExperts,
+    maxTracks: plan.maxTracks,
     maxVideoMinutes: plan.maxVideoMinutes,
     maxVideoMB: plan.maxVideoMB,
 
@@ -113,12 +113,12 @@ export function usePlanAccess(subscription?: SubscriptionRow): PlanAccess | null
       if (currentCount < 0) {
         return false;
       }
-      return currentCount < plan.allowedDomains;
+      return currentCount < plan.maxExperts;
     },
 
     canSelectTrack(): boolean {
       // כל החבילות מאפשרות לפחות תחום אחד
-      return plan.allowedDomains > 0;
+      return plan.maxTracks > 0;
     },
   };
 }

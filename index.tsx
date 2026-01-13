@@ -2368,8 +2368,8 @@ const ai = new GoogleGenAI({ apiKey });
         <Grid>
           {TRACKS.map((track, index) => {
             // הגבל את מספר התחומים לפי החבילה
-            const maxDomains = planAccess?.maxDomains || 4;
-            const isDisabled = !planAccess || index >= maxDomains;
+            const maxTracks = planAccess?.maxTracks || 4;
+            const isDisabled = !planAccess || index >= maxTracks;
             const isActive = activeTrack === track.id;
             
             return (

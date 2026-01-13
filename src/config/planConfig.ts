@@ -12,7 +12,8 @@ export interface PlanConfig {
   readonly maxVideoMinutes: number;
   readonly maxVideoMB: number;
   readonly maxStudents?: number;
-  readonly allowedDomains: number;
+  readonly maxExperts: number; // מספר מקסימלי של מומחים שניתן לבחור
+  readonly maxTracks: number; // מספר מקסימלי של תחומים (tracks) זמינים
   readonly features: Readonly<Record<FeatureKey, boolean>>;
 }
 
@@ -46,7 +47,8 @@ export const PLAN_CONFIG: Readonly<Record<PlanType, PlanConfig>> = {
     maxMinutesPerMonth: 1,
     maxVideoMinutes: 1,
     maxVideoMB: 10,
-    allowedDomains: 1,
+    maxExperts: 3, // עד 3 מומחים
+    maxTracks: 1, // רק תחום אחד
     features: {
       pdf_export: false,
       advanced_analysis: false,
@@ -66,7 +68,8 @@ export const PLAN_CONFIG: Readonly<Record<PlanType, PlanConfig>> = {
     maxMinutesPerMonth: 30,
     maxVideoMinutes: 3,
     maxVideoMB: 15,
-    allowedDomains: 2,
+    maxExperts: 8, // כל המומחים (8)
+    maxTracks: 1, // רק תחום אחד
     features: {
       pdf_export: true,
       advanced_analysis: false,
@@ -85,8 +88,9 @@ export const PLAN_CONFIG: Readonly<Record<PlanType, PlanConfig>> = {
     maxAnalysesPerMonth: 30,
     maxMinutesPerMonth: 100,
     maxVideoMinutes: 5,
-    maxVideoMB: 40,
-    allowedDomains: 4,
+    maxVideoMB: 20, // 20MB לפי הדרישות
+    maxExperts: 8, // כל המומחים (8)
+    maxTracks: 4, // כל התחומים (4)
     features: {
       pdf_export: true,
       advanced_analysis: true,
@@ -107,7 +111,8 @@ export const PLAN_CONFIG: Readonly<Record<PlanType, PlanConfig>> = {
     maxVideoMinutes: 5,
     maxVideoMB: 40,
     maxStudents: 10,
-    allowedDomains: 4,
+    maxExperts: 8,
+    maxTracks: 4,
     features: {
       pdf_export: true,
       advanced_analysis: true,
@@ -128,7 +133,8 @@ export const PLAN_CONFIG: Readonly<Record<PlanType, PlanConfig>> = {
     maxVideoMinutes: 5,
     maxVideoMB: 40,
     maxStudents: 30,
-    allowedDomains: 4,
+    maxExperts: 8,
+    maxTracks: 4,
     features: {
       pdf_export: true,
       advanced_analysis: true,

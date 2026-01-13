@@ -2270,51 +2270,23 @@ const ai = new GoogleGenAI({ apiKey });
   const currentExpertsList = EXPERTS_BY_TRACK[activeTrack];
   
   const handleSetTop3 = () => {
-    if (!planAccess) {
-      alert('אין הרשאה. נא להתחבר או לבדוק את החבילה שלך.');
-      return;
-    }
-    // אם כבר במצב "3 המובילים", לא צריך לעשות כלום
-    if (isTop3()) {
-      return;
-    }
-    const maxExperts = planAccess.maxExperts;
-    const top3 = currentExpertsList.slice(0, Math.min(3, maxExperts)).map(e => e.title);
+    const top3 = currentExpertsList.slice(0, 3).map(e => e.title);
     setSelectedExperts(top3);
   };
 
   const handleSetAll = () => {
-    if (!planAccess) {
-      alert('אין הרשאה. נא להתחבר או לבדוק את החבילה שלך.');
-      return;
-    }
-    const maxExperts = planAccess.maxExperts;
-    // אם כבר במצב "כל המומחים", לא צריך לעשות כלום
-    if (isAll()) {
-      return;
-    }
-    // בחבילת ניסיון - "כל המומחים" = 3 מומחים
-    // בחבילת יוצרים ויוצרים באקסטרים - כל 8 המומחים
-    const all = currentExpertsList.slice(0, maxExperts).map(e => e.title);
+    const all = currentExpertsList.map(e => e.title);
     setSelectedExperts(all);
   };
 
   const isTop3 = () => {
-    if (!planAccess) return false;
-    const maxExperts = planAccess.maxExperts;
-    const top3 = currentExpertsList.slice(0, Math.min(3, maxExperts)).map(e => e.title);
-    // בדוק אם כל המומחים שנבחרו הם בדיוק 3 המובילים
-    if (selectedExperts.length !== top3.length) return false;
-    return top3.every(exp => selectedExperts.includes(exp));
+    const top3 = currentExpertsList.slice(0, 3).map(e => e.title);
+    if (selectedExperts.length !== 3) return false;
+    return top3.every(t => selectedExperts.includes(t));
   };
 
   const isAll = () => {
-    if (!planAccess) return false;
-    const maxExperts = planAccess.maxExperts;
-    const all = currentExpertsList.slice(0, maxExperts).map(e => e.title);
-    // בדוק אם כל המומחים שנבחרו הם בדיוק כל המומחים
-    if (selectedExperts.length !== all.length) return false;
-    return all.every(exp => selectedExperts.includes(exp));
+    return selectedExperts.length === currentExpertsList.length;
   };
 
   if (checkingAuth) {
@@ -2434,29 +2406,11 @@ const ai = new GoogleGenAI({ apiKey });
              )}
            </ExpertControlText>
            <ExpertToggleGroup>
-              <ExpertToggleButton 
-                $active={isTop3()} 
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  handleSetTop3();
-                }}
-                disabled={!planAccess}
-                type="button"
-              >
+              <ExpertToggleButton $active={isTop3()} onClick={handleSetTop3}>
                 3 המובילים
               </ExpertToggleButton>
-              <ExpertToggleButton 
-                $active={isAll()} 
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  handleSetAll();
-                }}
-                disabled={!planAccess}
-                type="button"
-              >
-                {planAccess && planAccess.maxExperts > 3 ? 'כל המומחים' : `${planAccess?.maxExperts || 3} מומחים`}
+              <ExpertToggleButton $active={isAll()} onClick={handleSetAll}>
+                כל המומחים
               </ExpertToggleButton>
            </ExpertToggleGroup>
         </ExpertControlBar>

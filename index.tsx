@@ -1754,14 +1754,10 @@ const App = () => {
   }, []);
 
   useEffect(() => {
-    // הגבל את מספר המומחים לפי החבילה
-    // תמיד מתחיל עם 3 המובילים (או פחות אם maxExperts < 3)
-    if (planAccess) {
-      const maxExperts = planAccess.maxExperts;
-      const defaults = EXPERTS_BY_TRACK[activeTrack].slice(0, Math.min(3, maxExperts)).map(e => e.title);
-      setSelectedExperts(defaults);
-    }
-  }, [activeTrack, planAccess]);
+    // תמיד מתחיל עם 3 המובילים
+    const defaults = EXPERTS_BY_TRACK[activeTrack].slice(0, 3).map(e => e.title);
+    setSelectedExperts(defaults);
+  }, [activeTrack]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -2513,9 +2509,6 @@ const ai = new GoogleGenAI({ apiKey });
           )}
           {planAccess && selectedExperts.length < 3 && (
             <ErrorMsg>נא לבחור לפחות 3 מומחים כדי להמשיך</ErrorMsg>
-          )}
-          {planAccess && selectedExperts.length > (planAccess.maxExperts || 8) && (
-            <ErrorMsg>מספר המומחים שנבחרו חורג מהמגבלה של החבילה שלך ({planAccess.maxExperts} מומחים מקסימלי)</ErrorMsg>
           )}
         </InputWrapper>
 

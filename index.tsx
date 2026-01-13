@@ -1863,7 +1863,12 @@ const App = () => {
         // אם המומחה כבר נבחר, הסר אותו
         return prev.filter(t => t !== title);
       } else {
-        // בדוק את המגבלה לפי החבילה
+        // כשלא מחובר - אפשר לבחור כל המומחים
+        if (!user) {
+          return [...prev, title];
+        }
+        
+        // כשיש משתמש - בדוק את המגבלה לפי החבילה
         const maxExperts = planAccess?.maxExperts || 8;
         if (prev.length >= maxExperts) {
           // אם הגעת למגבלה, אפשר רק להחליף (לא להוסיף)
@@ -1887,9 +1892,20 @@ const App = () => {
     const selectedFile = e.target.files?.[0];
     if (!selectedFile) return;
 
-    // בדוק מגבלות לפי החבילה
+    // כשלא מחובר - אפשר להעלות קבצים (בלי בדיקות)
+    if (!user) {
+      const objectUrl = URL.createObjectURL(selectedFile);
+      setFile(selectedFile);
+      setPreviewUrl(objectUrl);
+      if (!isImprovementMode) {
+        setResult(null);
+      }
+      return;
+    }
+
+    // כשיש משתמש - בדוק מגבלות לפי החבילה
     if (!planAccess) {
-      alert("אין הרשאה להעלות קבצים. נא להתחבר או לבדוק את החבילה שלך.");
+      alert("אין הרשאה להעלות קבצים. נא לבדוק את החבילה שלך.");
       resetInput();
       return;
     }
@@ -1919,7 +1935,7 @@ const App = () => {
 
       videoEl.onloadedmetadata = () => {
         if (!planAccess) {
-          alert("אין הרשאה להעלות סרטונים. נא להתחבר או לבדוק את החבילה שלך.");
+          alert("אין הרשאה להעלות סרטונים. נא לבדוק את החבילה שלך.");
           URL.revokeObjectURL(objectUrl);
           resetInput();
           return;
@@ -2489,20 +2505,6 @@ const ai = new GoogleGenAI({ apiKey });
 
 
         <SectionLabel>בחר את מסלול הניתוח שלך:</SectionLabel>
-        {!user && (
-          <div style={{ 
-            textAlign: 'center', 
-            marginBottom: '20px',
-            color: '#4CAF50',
-            fontSize: '0.95rem',
-            padding: '10px',
-            background: 'rgba(76, 175, 80, 0.1)',
-            border: '1px solid rgba(76, 175, 80, 0.3)',
-            borderRadius: '8px'
-          }}>
-            נא להתחבר או להירשם כדי להשתמש באפליקציה
-          </div>
-        )}
         {user && !planAccess && (
           <ErrorMsg style={{ textAlign: 'center', marginBottom: '20px' }}>
             אין הרשאה. נא לבדוק את החבילה שלך.

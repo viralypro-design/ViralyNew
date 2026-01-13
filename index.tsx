@@ -1796,21 +1796,11 @@ const App = () => {
   };
 
   const toggleExpert = (title: string) => {
-    if (!planAccess) {
-      alert('אין הרשאה. נא להתחבר או לבדוק את החבילה שלך.');
-      return;
-    }
-    
     setSelectedExperts(prev => {
       if (prev.includes(title)) {
         return prev.filter(t => t !== title);
       } else {
-        // הגבל לפי החבילה
-        const maxExperts = planAccess.maxExperts;
-        if (prev.length >= maxExperts) {
-          alert(`הגעת למגבלת המומחים של החבילה שלך (${maxExperts} מומחים מקסימלי). שדרג את החבילה להמשך.`);
-          return prev;
-        }
+        if (prev.length >= 8) return prev;
         return [...prev, title];
       }
     });
@@ -2418,36 +2408,12 @@ const ai = new GoogleGenAI({ apiKey });
         <Grid>
           {EXPERTS_BY_TRACK[activeTrack].map((expert, i) => {
             const isSelected = selectedExperts.includes(expert.title);
-            const maxExperts = planAccess?.maxExperts || 8;
-            const canSelect = !isSelected && selectedExperts.length < maxExperts;
-            const isDisabled = !planAccess || (!isSelected && !canSelect);
-            
             return (
               <FeatureCard 
                 key={i} 
                 $selected={isSelected}
-                onClick={() => !isDisabled && toggleExpert(expert.title)}
-                style={{
-                  opacity: isDisabled ? 0.5 : 1,
-                  cursor: isDisabled ? 'not-allowed' : 'pointer',
-                  position: 'relative'
-                }}
+                onClick={() => toggleExpert(expert.title)}
               >
-                {isDisabled && !isSelected && (
-                  <div style={{
-                    position: 'absolute',
-                    top: '5px',
-                    right: '5px',
-                    background: '#ff4d4d',
-                    color: '#fff',
-                    padding: '2px 8px',
-                    borderRadius: '4px',
-                    fontSize: '0.7rem',
-                    fontWeight: 700
-                  }}>
-                    🔒
-                  </div>
-                )}
                 <FeatureTitle $selected={isSelected}>{expert.title}</FeatureTitle>
                 <FeatureDesc>{expert.desc}</FeatureDesc>
               </FeatureCard>

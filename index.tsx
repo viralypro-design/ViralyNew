@@ -1807,9 +1807,20 @@ const App = () => {
   const toggleExpert = (title: string) => {
     setSelectedExperts(prev => {
       if (prev.includes(title)) {
+        // אם המומחה כבר נבחר, הסר אותו
         return prev.filter(t => t !== title);
       } else {
-        if (prev.length >= 8) return prev;
+        // בדוק את המגבלה לפי החבילה
+        const maxExperts = planAccess?.maxExperts || 8;
+        if (prev.length >= maxExperts) {
+          // אם הגעת למגבלה, אפשר רק להחליף (לא להוסיף)
+          if (maxExperts <= 3) {
+            // בחבילת ניסיון - לא ניתן להוסיף יותר מ-3, רק להחליף
+            alert(`החבילה שלך מוגבלת ל-${maxExperts} מומחים. הסר מומחה קיים כדי לבחור אחר במקומו.`);
+            return prev;
+          }
+          return prev;
+        }
         return [...prev, title];
       }
     });

@@ -436,19 +436,25 @@ const ExpertToggleGroup = styled.div`
 
 const ExpertToggleButton = styled.button<{ $active: boolean }>`
   background: ${props => props.$active ? '#D4A043' : 'transparent'};
-  color: ${props => props.$active ? '#000' : '#888'};
+  color: ${props => props.$active ? '#000' : props.disabled ? '#555' : '#888'};
   border: none;
   border-radius: 50px;
   padding: 6px 18px;
   font-size: 0.85rem;
   font-family: 'Assistant', sans-serif;
   font-weight: 700;
-  cursor: pointer;
+  cursor: ${props => props.disabled ? 'not-allowed' : 'pointer'};
   transition: all 0.3s;
   white-space: nowrap;
+  opacity: ${props => props.disabled ? 0.4 : 1};
 
-  &:hover {
+  &:hover:not(:disabled) {
     color: ${props => props.$active ? '#000' : '#D4A043'};
+  }
+  
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
   }
 `;
 

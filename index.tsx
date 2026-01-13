@@ -1748,6 +1748,8 @@ const App = () => {
   const [isPlansModalOpen, setIsPlansModalOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [authModalInitialPlan, setAuthModalInitialPlan] = useState<PlanType | undefined>(undefined);
+  const [authModalInitialMode, setAuthModalInitialMode] = useState<'login' | 'signup'>('login');
   const [modalTab, setModalTab] = useState('actors');
   const [user, setUser] = useState<any>(null);
   const [checkingAuth, setCheckingAuth] = useState(true);
@@ -2489,11 +2491,21 @@ const ai = new GoogleGenAI({ apiKey });
           onClose={() => setIsPlansModalOpen(false)}
           currentPlan={subscription?.plan_type}
           onUpgrade={handleUpgradePlan}
+          onSignUpWithPlan={(planType) => {
+            setIsPlansModalOpen(false);
+            setAuthModalInitialPlan(planType);
+            setAuthModalInitialMode('signup');
+            setIsAuthModalOpen(true);
+          }}
         />
         
         <AuthModal
           isOpen={isAuthModalOpen}
-          onClose={() => setIsAuthModalOpen(false)}
+          onClose={() => {
+            setIsAuthModalOpen(false);
+            setAuthModalInitialPlan(undefined);
+            setAuthModalInitialMode('login');
+          }}
           onSuccess={() => {
             setCheckingAuth(true);
             setTimeout(() => {
@@ -2504,7 +2516,11 @@ const ai = new GoogleGenAI({ apiKey });
                 setCheckingAuth(false);
               });
             }, 500);
+            setAuthModalInitialPlan(undefined);
+            setAuthModalInitialMode('login');
           }}
+          initialPlan={authModalInitialPlan}
+          initialMode={authModalInitialMode}
         />
         
         {user && (

@@ -344,18 +344,38 @@ interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  initialPlan?: PlanType;
+  initialMode?: 'login' | 'signup';
 }
 
-export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => {
-  const [mode, setMode] = useState<'login' | 'signup'>('login');
+export const AuthModal: React.FC<AuthModalProps> = ({ 
+  isOpen, 
+  onClose, 
+  onSuccess,
+  initialPlan,
+  initialMode = 'login'
+}) => {
+  const [mode, setMode] = useState<'login' | 'signup'>(initialMode);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [selectedPlan, setSelectedPlan] = useState<PlanType>('trial');
+  const [selectedPlan, setSelectedPlan] = useState<PlanType>(initialPlan || 'trial');
   const [showPlanSelection, setShowPlanSelection] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+
+  // עדכן את המצב כאשר initialPlan או initialMode משתנים
+  React.useEffect(() => {
+    if (isOpen) {
+      if (initialMode) {
+        setMode(initialMode);
+      }
+      if (initialPlan) {
+        setSelectedPlan(initialPlan);
+      }
+    }
+  }, [isOpen, initialPlan, initialMode]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();

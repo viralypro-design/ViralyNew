@@ -203,13 +203,15 @@ interface PlansInfoModalProps {
   onClose: () => void;
   currentPlan?: PlanType;
   onUpgrade?: (planType: PlanType) => void;
+  onSignUpWithPlan?: (planType: PlanType) => void;
 }
 
 export const PlansInfoModal: React.FC<PlansInfoModalProps> = ({ 
   isOpen, 
   onClose, 
   currentPlan,
-  onUpgrade 
+  onUpgrade,
+  onSignUpWithPlan
 }) => {
   if (!isOpen) return null;
 

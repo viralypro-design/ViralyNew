@@ -2289,14 +2289,11 @@ const ai = new GoogleGenAI({ apiKey });
       return;
     }
     const maxExperts = planAccess.maxExperts;
-    // בחבילת ניסיון - לא ניתן לבחור "כל המומחים" (רק 3)
-    if (maxExperts <= 3) {
-      return; // לא עושה כלום בחבילת ניסיון
-    }
     // אם כבר במצב "כל המומחים", לא צריך לעשות כלום
     if (isAll()) {
       return;
     }
+    // בחבילת ניסיון - "כל המומחים" = 3 מומחים
     // בחבילת יוצרים ויוצרים באקסטרים - כל 8 המומחים
     const all = currentExpertsList.slice(0, maxExperts).map(e => e.title);
     setSelectedExperts(all);

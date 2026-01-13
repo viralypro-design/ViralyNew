@@ -2376,7 +2376,10 @@ const ai = new GoogleGenAI({ apiKey });
           {TRACKS.map((track, index) => {
             // הגבל את מספר התחומים לפי החבילה
             const maxTracks = planAccess?.maxTracks || 4;
-            const isDisabled = !planAccess || index >= maxTracks;
+            // אם maxTracks = 1, רק התחום הראשון זמין (או התחום הנוכחי אם כבר נבחר)
+            const isDisabled = !planAccess || 
+              (maxTracks <= 1 && index > 0 && activeTrack !== track.id) || 
+              (maxTracks > 1 && index >= maxTracks);
             const isActive = activeTrack === track.id;
             
             return (

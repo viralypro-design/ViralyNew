@@ -8,11 +8,17 @@ import { FeatureKey, SubscriptionRow } from '@/types/subscription';
  */
 export interface PlanAccess {
   readonly planLabel: string;
+  readonly maxExperts: number; // מספר מקסימלי של מומחים שניתן לבחור
+  readonly maxDomains: number; // מספר מקסימלי של תחומים (tracks) זמינים
+  readonly maxVideoMinutes: number; // אורך מקסימלי של סרטון בדקות
+  readonly maxVideoMB: number; // גודל מקסימלי של סרטון ב-MB
   hasFeature(feature: FeatureKey): boolean;
   canUploadVideo(videoMinutes: number, videoMB: number): boolean;
   canRunAnalysis(): boolean;
   hasMinutesLeft(): boolean;
   canAddStudent(currentCount: number): boolean;
+  canSelectExpert(currentCount: number): boolean; // האם ניתן לבחור עוד מומחה
+  canSelectTrack(): boolean; // האם ניתן לבחור תחום נוסף
 }
 
 /**
@@ -46,6 +52,10 @@ export function usePlanAccess(subscription?: SubscriptionRow): PlanAccess | null
   // אין גישה ל-state חיצוני או localStorage
   return {
     planLabel: plan.label,
+    maxExperts: plan.allowedDomains, // allowedDomains = מספר מומחים מקסימלי
+    maxDomains: plan.allowedDomains, // allowedDomains = מספר תחומים מקסימלי
+    maxVideoMinutes: plan.maxVideoMinutes,
+    maxVideoMB: plan.maxVideoMB,
 
     hasFeature(feature: FeatureKey): boolean {
       return Boolean(plan.features[feature]);
@@ -96,6 +106,19 @@ export function usePlanAccess(subscription?: SubscriptionRow): PlanAccess | null
         return false;
       }
       return currentCount < plan.maxStudents;
+    },
+
+    canSelectExpert(currentCount: number): boolean {
+      // Validation - וידוא שהערך תקין
+      if (currentCount < 0) {
+        return false;
+      }
+      return currentCount < plan.allowedDomains;
+    },
+
+    canSelectTrack(): boolean {
+      // כל החבילות מאפשרות לפחות תחום אחד
+      return plan.allowedDomains > 0;
     },
   };
 }

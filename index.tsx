@@ -2,9 +2,10 @@ import React, { useState, useRef, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import styled, { createGlobalStyle, keyframes, css } from 'styled-components';
 import { GoogleGenAI } from "@google/genai";
-import { SubscriptionProvider } from '@/context/SubscriptionProvider';
+import { SubscriptionProvider, useSubscription } from '@/context/SubscriptionProvider';
 import { supabase } from '@/lib/supabaseClient';
 import { SimplePlanManager } from '@/components/SimplePlanManager';
+import { usePlanAccess } from '@/hooks/usePlanAccess';
 import './index.css';
 
 // --- Types ---
@@ -27,6 +28,8 @@ interface AnalysisResult {
 }
 
 // --- Constants ---
+// הערה: המגבלות האמיתיות נקבעות לפי החבילה דרך planAccess
+// אלה הן מגבלות כלליות רק ל-validation ראשוני
 const MAX_VIDEO_SECONDS = 5 * 60; // 5 minutes
 const MAX_FILE_BYTES = 20 * 1024 * 1024; // 20MB
 
@@ -1708,9 +1711,12 @@ const App = () => {
   const [loading, setLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalTab, setModalTab] = useState('actors');
-  const [hasPremiumAccess] = useState(true); // Placeholder for future premium gating logic
   const [user, setUser] = useState<any>(null);
   const [checkingAuth, setCheckingAuth] = useState(true);
+  
+  // Subscription and plan access
+  const { subscription, loading: subscriptionLoading } = useSubscription();
+  const planAccess = usePlanAccess(subscription);
   
   // Results
   const [result, setResult] = useState<AnalysisResult | null>(null);
@@ -1742,9 +1748,11 @@ const App = () => {
   }, []);
 
   useEffect(() => {
-    const defaults = EXPERTS_BY_TRACK[activeTrack].slice(0, 3).map(e => e.title);
+    // הגבל את מספר המומחים לפי החבילה
+    const maxExperts = planAccess?.maxExperts || 3;
+    const defaults = EXPERTS_BY_TRACK[activeTrack].slice(0, Math.min(3, maxExperts)).map(e => e.title);
     setSelectedExperts(defaults);
-  }, [activeTrack]);
+  }, [activeTrack, planAccess]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -1760,6 +1768,12 @@ const App = () => {
   };
 
   const handleTrackChange = (id: string) => {
+    // בדוק אם יש הרשאה לבחור תחום
+    if (!planAccess) {
+      alert('אין הרשאה. נא להתחבר או לבדוק את החבילה שלך.');
+      return;
+    }
+    
     setActiveTrack(id as TrackId);
     setResult(null);
     setPreviousResult(null);
@@ -1771,11 +1785,21 @@ const App = () => {
   };
 
   const toggleExpert = (title: string) => {
+    if (!planAccess) {
+      alert('אין הרשאה. נא להתחבר או לבדוק את החבילה שלך.');
+      return;
+    }
+    
     setSelectedExperts(prev => {
       if (prev.includes(title)) {
         return prev.filter(t => t !== title);
       } else {
-        if (prev.length >= 8) return prev;
+        // הגבל לפי החבילה
+        const maxExperts = planAccess.maxExperts;
+        if (prev.length >= maxExperts) {
+          alert(`הגעת למגבלת המומחים של החבילה שלך (${maxExperts} מומחים מקסימלי). שדרג את החבילה להמשך.`);
+          return prev;
+        }
         return [...prev, title];
       }
     });
@@ -1789,8 +1813,17 @@ const App = () => {
     const selectedFile = e.target.files?.[0];
     if (!selectedFile) return;
 
-    if (selectedFile.size > MAX_FILE_BYTES) {
-      alert("הקובץ גדול מדי. מגבלה: עד 5 דקות או 20MB.");
+    // בדוק מגבלות לפי החבילה
+    if (!planAccess) {
+      alert("אין הרשאה להעלות קבצים. נא להתחבר או לבדוק את החבילה שלך.");
+      resetInput();
+      return;
+    }
+    
+    const maxMB = planAccess.maxVideoMB;
+    const maxBytes = maxMB * 1024 * 1024;
+    if (selectedFile.size > maxBytes) {
+      alert(`הקובץ גדול מדי. מגבלת החבילה שלך: עד ${maxMB}MB.`);
       resetInput();
       return;
     }
@@ -1811,8 +1844,17 @@ const App = () => {
       videoEl.src = objectUrl;
 
       videoEl.onloadedmetadata = () => {
-        if (videoEl.duration > MAX_VIDEO_SECONDS) {
-          alert("הסרטון חורג מהמגבלה: עד 5 דקות או 20MB.");
+        if (!planAccess) {
+          alert("אין הרשאה להעלות סרטונים. נא להתחבר או לבדוק את החבילה שלך.");
+          URL.revokeObjectURL(objectUrl);
+          resetInput();
+          return;
+        }
+        
+        const maxMinutes = planAccess.maxVideoMinutes;
+        const maxSeconds = maxMinutes * 60;
+        if (videoEl.duration > maxSeconds) {
+          alert(`הסרטון חורג מהמגבלה של החבילה שלך: עד ${maxMinutes} דקות.`);
           URL.revokeObjectURL(objectUrl);
           resetInput();
           return;
@@ -1889,8 +1931,8 @@ const App = () => {
   const handleExportPdf = () => {
     if (!result) return;
 
-    if (!hasPremiumAccess) {
-      alert('יצוא ל-PDF זמין למנויי פרימיום בלבד.');
+    if (!planAccess || !planAccess.hasFeature('pdf_export')) {
+      alert('יצוא ל-PDF זמין רק לחבילות מסוימות. שדרג את החבילה שלך להמשך.');
       return;
     }
 
@@ -2208,17 +2250,31 @@ const ai = new GoogleGenAI({ apiKey });
 
   const handleGenerate = handleAnalyze;
 
-  const isReady = (!!prompt || !!file) && selectedExperts.length >= 3;
+  // בדוק אם מוכן לניתוח - צריך לפחות 3 מומחים אבל לא יותר מהמגבלה
+  const minExperts = 3;
+  const maxExperts = planAccess?.maxExperts || 8;
+  const hasEnoughExperts = selectedExperts.length >= minExperts && selectedExperts.length <= maxExperts;
+  const isReady = (!!prompt || !!file) && hasEnoughExperts && planAccess?.canRunAnalysis() && planAccess?.hasMinutesLeft();
 
   const currentExpertsList = EXPERTS_BY_TRACK[activeTrack];
   
   const handleSetTop3 = () => {
-    const top3 = currentExpertsList.slice(0, 3).map(e => e.title);
+    if (!planAccess) {
+      alert('אין הרשאה. נא להתחבר או לבדוק את החבילה שלך.');
+      return;
+    }
+    const maxExperts = planAccess.maxExperts;
+    const top3 = currentExpertsList.slice(0, Math.min(3, maxExperts)).map(e => e.title);
     setSelectedExperts(top3);
   };
 
   const handleSetAll = () => {
-    const all = currentExpertsList.map(e => e.title);
+    if (!planAccess) {
+      alert('אין הרשאה. נא להתחבר או לבדוק את החבילה שלך.');
+      return;
+    }
+    const maxExperts = planAccess.maxExperts;
+    const all = currentExpertsList.slice(0, maxExperts).map(e => e.title);
     setSelectedExperts(all);
   };
 
@@ -2304,17 +2360,49 @@ const ai = new GoogleGenAI({ apiKey });
         <SimplePlanManager />
 
         <SectionLabel>בחר את מסלול הניתוח שלך:</SectionLabel>
+        {!planAccess && (
+          <ErrorMsg style={{ textAlign: 'center', marginBottom: '20px' }}>
+            אין הרשאה. נא להתחבר או לבדוק את החבילה שלך.
+          </ErrorMsg>
+        )}
         <Grid>
-          {TRACKS.map(track => (
-            <TrackCard 
-              key={track.id} 
-              $active={activeTrack === track.id}
-              onClick={() => handleTrackChange(track.id)}
-            >
-              {track.icon}
-              <span>{track.label}</span>
-            </TrackCard>
-          ))}
+          {TRACKS.map((track, index) => {
+            // הגבל את מספר התחומים לפי החבילה
+            const maxDomains = planAccess?.maxDomains || 4;
+            const isDisabled = !planAccess || index >= maxDomains;
+            const isActive = activeTrack === track.id;
+            
+            return (
+              <TrackCard 
+                key={track.id} 
+                $active={isActive}
+                onClick={() => !isDisabled && handleTrackChange(track.id)}
+                style={{
+                  opacity: isDisabled ? 0.5 : 1,
+                  cursor: isDisabled ? 'not-allowed' : 'pointer',
+                  position: 'relative'
+                }}
+              >
+                {isDisabled && !isActive && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '5px',
+                    right: '5px',
+                    background: '#ff4d4d',
+                    color: '#fff',
+                    padding: '2px 8px',
+                    borderRadius: '4px',
+                    fontSize: '0.7rem',
+                    fontWeight: 700
+                  }}>
+                    🔒
+                  </div>
+                )}
+                {track.icon}
+                <span>{track.label}</span>
+              </TrackCard>
+            );
+          })}
         </Grid>
         
         <TrackDescriptionText>
@@ -2326,6 +2414,11 @@ const ai = new GoogleGenAI({ apiKey });
         <ExpertControlBar>
            <ExpertControlText>
              הנבחרת שלך ב<strong>{TRACKS.find(t => t.id === activeTrack)?.label}</strong>: אלו המומחים ומה הם בודקים
+             {planAccess && (
+               <span style={{ color: '#D4A043', marginRight: '10px' }}>
+                 ({selectedExperts.length} / {planAccess.maxExperts} מומחים)
+               </span>
+             )}
            </ExpertControlText>
            <ExpertToggleGroup>
               <ExpertToggleButton $active={isTop3()} onClick={handleSetTop3}>3 המובילים</ExpertToggleButton>
@@ -2336,12 +2429,36 @@ const ai = new GoogleGenAI({ apiKey });
         <Grid>
           {EXPERTS_BY_TRACK[activeTrack].map((expert, i) => {
             const isSelected = selectedExperts.includes(expert.title);
+            const maxExperts = planAccess?.maxExperts || 8;
+            const canSelect = !isSelected && selectedExperts.length < maxExperts;
+            const isDisabled = !planAccess || (!isSelected && !canSelect);
+            
             return (
               <FeatureCard 
                 key={i} 
                 $selected={isSelected}
-                onClick={() => toggleExpert(expert.title)}
+                onClick={() => !isDisabled && toggleExpert(expert.title)}
+                style={{
+                  opacity: isDisabled ? 0.5 : 1,
+                  cursor: isDisabled ? 'not-allowed' : 'pointer',
+                  position: 'relative'
+                }}
               >
+                {isDisabled && !isSelected && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '5px',
+                    right: '5px',
+                    background: '#ff4d4d',
+                    color: '#fff',
+                    padding: '2px 8px',
+                    borderRadius: '4px',
+                    fontSize: '0.7rem',
+                    fontWeight: 700
+                  }}>
+                    🔒
+                  </div>
+                )}
                 <FeatureTitle $selected={isSelected}>{expert.title}</FeatureTitle>
                 <FeatureDesc>{expert.desc}</FeatureDesc>
               </FeatureCard>
@@ -2426,8 +2543,20 @@ const ai = new GoogleGenAI({ apiKey });
           >
             {loading ? 'צוות המומחים צופה כעת בסרטון' : (isImprovementMode ? 'נתח שיפורים' : 'אקשן !')}
           </ActionButton>
-          {selectedExperts.length < 3 && (
+          {!planAccess && (
+            <ErrorMsg>אין הרשאה להריץ ניתוח. נא להתחבר או לבדוק את החבילה שלך.</ErrorMsg>
+          )}
+          {planAccess && !planAccess.canRunAnalysis() && (
+            <ErrorMsg>הגעת למכסת הניתוחים החודשית. שדרג את החבילה להמשך.</ErrorMsg>
+          )}
+          {planAccess && !planAccess.hasMinutesLeft() && (
+            <ErrorMsg>הגעת למכסת הדקות החודשית. שדרג את החבילה להמשך.</ErrorMsg>
+          )}
+          {planAccess && selectedExperts.length < 3 && (
             <ErrorMsg>נא לבחור לפחות 3 מומחים כדי להמשיך</ErrorMsg>
+          )}
+          {planAccess && selectedExperts.length > (planAccess.maxExperts || 8) && (
+            <ErrorMsg>מספר המומחים שנבחרו חורג מהמגבלה של החבילה שלך ({planAccess.maxExperts} מומחים מקסימלי)</ErrorMsg>
           )}
         </InputWrapper>
 
@@ -2490,7 +2619,7 @@ const ai = new GoogleGenAI({ apiKey });
             </div>
 
             <ActionButtonsContainer>
-              <PrimaryButton onClick={handleExportPdf} disabled={loading || !hasPremiumAccess}>
+              <PrimaryButton onClick={handleExportPdf} disabled={loading || !planAccess?.hasFeature('pdf_export')}>
                 <PdfIcon />
                 יצוא ניתוח ל-PDF <PremiumBadge>פרימיום</PremiumBadge>
               </PrimaryButton>

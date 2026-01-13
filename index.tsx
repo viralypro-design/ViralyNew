@@ -2285,6 +2285,8 @@ const ai = new GoogleGenAI({ apiKey });
           setActiveTab={setModalTab}
         />
 
+        <PlanTester />
+
         <SectionLabel>בחר את מסלול הניתוח שלך:</SectionLabel>
         <Grid>
           {TRACKS.map(track => (

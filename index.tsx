@@ -1755,9 +1755,12 @@ const App = () => {
 
   useEffect(() => {
     // הגבל את מספר המומחים לפי החבילה
-    const maxExperts = planAccess?.maxExperts || 3;
-    const defaults = EXPERTS_BY_TRACK[activeTrack].slice(0, Math.min(3, maxExperts)).map(e => e.title);
-    setSelectedExperts(defaults);
+    // תמיד מתחיל עם 3 המובילים (או פחות אם maxExperts < 3)
+    if (planAccess) {
+      const maxExperts = planAccess.maxExperts;
+      const defaults = EXPERTS_BY_TRACK[activeTrack].slice(0, Math.min(3, maxExperts)).map(e => e.title);
+      setSelectedExperts(defaults);
+    }
   }, [activeTrack, planAccess]);
 
   const handleLogout = async () => {

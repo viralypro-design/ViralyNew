@@ -4,6 +4,7 @@ import { useSubscription } from '@/context/SubscriptionProvider';
 import { usePlanAccess } from '@/hooks/usePlanAccess';
 import { PLAN_CONFIG, ACTIVE_PLANS } from '@/config/planConfig';
 import { PlanType } from '@/types/subscription';
+import { supabase } from '@/lib/supabaseClient';
 
 const Container = styled.div`
   background: linear-gradient(145deg, #0a0a0a, #111);
@@ -197,6 +198,68 @@ export function SimplePlanManager() {
   const { subscription, loading, refresh } = useSubscription();
   const access = usePlanAccess(subscription);
   const [copiedPlan, setCopiedPlan] = useState<string | null>(null);
+  const [changingPlan, setChangingPlan] = useState(false);
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const handleChangePlan = async (planType: PlanType) => {
+    if (!subscription || changingPlan) return;
+    
+    setChangingPlan(true);
+    setMessage(null);
+    
+    try {
+      // נסה לעדכן דרך RPC function
+      const { data, error } = await supabase.rpc('update_user_plan_type', {
+        new_plan_type: planType
+      });
+      
+      if (error) {
+        // אם RPC לא עובד, נסה דרך SQL ישיר (יתכשל בגלל RLS אבל נראה את השגיאה)
+        console.log('RPC failed, trying direct update (will likely fail due to RLS):', error);
+        
+        const { error: updateError } = await supabase
+          .from('user_subscriptions')
+          .update({ plan_type: planType })
+          .eq('user_id', subscription.user_id);
+        
+        if (updateError) {
+          // אם גם זה נכשל, הצג הודעת שגיאה והעתק SQL
+          if (updateError.message.includes('policy') || updateError.message.includes('permission')) {
+            const sql = `UPDATE public.user_subscriptions 
+SET plan_type = '${planType}' 
+WHERE user_id = '${subscription.user_id}';`;
+            
+            navigator.clipboard.writeText(sql);
+            setCopiedPlan(planType);
+            setMessage({
+              type: 'error',
+              text: `לא ניתן לשנות חבילה דרך האפליקציה. SQL הועתק ללוח. נא להריץ ב-Supabase SQL Editor.`
+            });
+          } else {
+            setMessage({ type: 'error', text: `שגיאה: ${updateError.message}` });
+          }
+        } else {
+          // הצלחה דרך update ישיר (לא אמור לקרות בגלל RLS)
+          setMessage({ type: 'success', text: `החבילה שונתה ל-${PLAN_CONFIG[planType].label}!` });
+          await refresh();
+        }
+      } else if (data && data.success) {
+        // הצלחה דרך RPC
+        setMessage({ type: 'success', text: `החבילה שונתה ל-${PLAN_CONFIG[planType].label}!` });
+        await refresh();
+      } else {
+        // RPC החזיר שגיאה
+        setMessage({ 
+          type: 'error', 
+          text: data?.error || 'שגיאה לא ידועה בעדכון החבילה' 
+        });
+      }
+    } catch (err: any) {
+      setMessage({ type: 'error', text: `שגיאה: ${err.message}` });
+    } finally {
+      setChangingPlan(false);
+    }
+  };
 
   const handleCopySQL = (planType: PlanType) => {
     if (!subscription) return;
@@ -315,27 +378,41 @@ WHERE user_id = '${subscription.user_id}';`;
               </div>
               <button
                 className="change-button"
-                onClick={() => canSelect && handleCopySQL(planType)}
-                disabled={isActive}
+                onClick={() => canSelect && handleChangePlan(planType)}
+                disabled={isActive || changingPlan}
               >
                 {isActive
                   ? 'חבילה פעילה'
-                  : copiedPlan === planType
-                  ? '✓ הועתק!'
-                  : '📋 העתק SQL'}
+                  : changingPlan
+                  ? 'מעדכן...'
+                  : '🔄 שנה חבילה'}
               </button>
             </PlanCard>
           );
         })}
       </PlansGrid>
 
+      {message && (
+        <div style={{
+          padding: '15px',
+          marginBottom: '20px',
+          borderRadius: '8px',
+          background: message.type === 'success' ? 'rgba(76, 175, 80, 0.2)' : 'rgba(244, 67, 54, 0.2)',
+          border: `1px solid ${message.type === 'success' ? '#4CAF50' : '#f44336'}`,
+          color: message.type === 'success' ? '#4CAF50' : '#f44336',
+          textAlign: 'center',
+          fontWeight: 600
+        }}>
+          {message.text}
+        </div>
+      )}
+      
       <InstructionsBox>
         <h4>📝 איך לשנות חבילה:</h4>
         <ol>
-          <li>לחץ על כפתור <strong>"📋 העתק SQL"</strong> של החבילה הרצויה</li>
-          <li>לך ל-<strong>Supabase Dashboard → SQL Editor</strong></li>
-          <li>הדבק את ה-SQL והרץ (Ctrl+V / Cmd+V)</li>
-          <li>חזור לאפליקציה ולחץ על <strong>"🔄 רענן נתונים"</strong> למטה</li>
+          <li>לחץ על כפתור <strong>"🔄 שנה חבילה"</strong> של החבילה הרצויה</li>
+          <li>החבילה תתעדכן אוטומטית ללא צורך ברענון</li>
+          <li>אם יש שגיאה, נסה דרך <strong>Supabase Dashboard → SQL Editor</strong></li>
         </ol>
       </InstructionsBox>
 

@@ -46,7 +46,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     }
 
     const { data, error } = await supabase
-      .from('subscriptions')
+      .from('user_subscriptions')
       .select('*')
       .eq('user_id', session.user.id)
       .single();

@@ -1,18 +1,32 @@
 import React from 'react';
+import { useSubscription } from '@/context/SubscriptionProvider';
 import { usePlanAccess } from '@/hooks/usePlanAccess';
-import { SubscriptionRow } from '@/types/subscription';
 
-// דוגמה לשימוש ב-hook ב-UI
-interface ExampleUsageProps {
-  subscription?: SubscriptionRow;
-}
+// דוגמה לשימוש נכון ב-usePlanAccess עם useSubscription
+export function ExampleUsage() {
+  const { subscription, loading } = useSubscription();
 
-export function ExampleUsage({ subscription }: ExampleUsageProps) {
+  // טעינה
+  if (loading) {
+    return <div>טוען...</div>; // או <Loader />
+  }
+
+  // אם אין subscription - המשתמש עדיין לא בחר חבילה
+  if (!subscription) {
+    return (
+      <div>
+        {/* או <ChoosePlanScreen /> */}
+        <p>אנא בחר חבילה כדי להמשיך</p>
+      </div>
+    );
+  }
+
+  // קבלת access לפי subscription
   const access = usePlanAccess(subscription);
 
-  // אם אין מנוי פעיל - הצג טעינה או הודעת שגיאה
+  // אם אין access (לא אמור לקרות אחרי בדיקת subscription, אבל זה בטיחות)
   if (!access) {
-    return <div>טוען...</div>; // או <Loader />
+    return <div>שגיאה בטעינת הרשאות</div>;
   }
 
   // בדיקה אם ניתן להריץ ניתוח

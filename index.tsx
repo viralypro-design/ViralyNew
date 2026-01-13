@@ -2,6 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import styled, { createGlobalStyle, keyframes, css } from 'styled-components';
 import { GoogleGenAI } from "@google/genai";
+import { SubscriptionProvider } from '@/context/SubscriptionProvider';
+import { supabase } from '@/lib/supabaseClient';
 import './index.css';
 
 // --- Types ---
@@ -1406,6 +1408,201 @@ const EXPERTS_BY_TRACK: Record<string, { title: string; desc: string }[]> = {
   ],
 };
 
+// --- Login Component ---
+
+const LoginContainer = styled.div`
+  max-width: 500px;
+  margin: 50px auto;
+  padding: 40px;
+  background: #0a0a0a;
+  border: 1px solid #D4A043;
+  border-radius: 12px;
+  box-shadow: 0 0 40px rgba(212, 160, 67, 0.2);
+`;
+
+const LoginTitle = styled.h2`
+  color: #D4A043;
+  text-align: center;
+  margin-bottom: 30px;
+  font-size: 1.8rem;
+`;
+
+const LoginForm = styled.form`
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+`;
+
+const LoginInput = styled.input`
+  width: 100%;
+  background: #0f0f0f;
+  border: 1px solid #444;
+  border-radius: 8px;
+  padding: 15px;
+  color: #e0e0e0;
+  font-family: 'Assistant', sans-serif;
+  font-size: 1rem;
+  transition: border-color 0.3s;
+  
+  &:focus {
+    outline: none;
+    border-color: #D4A043;
+  }
+  
+  &::placeholder {
+    color: #999;
+  }
+`;
+
+const LoginButton = styled.button`
+  background: linear-gradient(135deg, #b8862e 0%, #e6be74 50%, #b8862e 100%);
+  background-size: 200% auto;
+  color: #000;
+  border: none;
+  border-radius: 50px;
+  padding: 15px;
+  font-family: 'Assistant', sans-serif;
+  font-weight: 700;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(212, 160, 67, 0.3);
+
+  &:hover:not(:disabled) {
+    background-position: right center;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(212, 160, 67, 0.5);
+  }
+  
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+`;
+
+const TestUserInfo = styled.div`
+  background: rgba(212, 160, 67, 0.1);
+  border: 1px dashed rgba(212, 160, 67, 0.4);
+  border-radius: 8px;
+  padding: 15px;
+  margin-bottom: 20px;
+  text-align: center;
+  
+  h3 {
+    color: #D4A043;
+    font-size: 1rem;
+    margin-bottom: 10px;
+  }
+  
+  p {
+    color: #ccc;
+    font-size: 0.9rem;
+    margin: 5px 0;
+  }
+`;
+
+const UserInfo = styled.div`
+  text-align: center;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #333;
+  
+  p {
+    color: #ccc;
+    margin: 5px 0;
+  }
+  
+  strong {
+    color: #D4A043;
+  }
+`;
+
+const LogoutButton = styled.button`
+  background: transparent;
+  border: 1px solid #888;
+  color: #ccc;
+  padding: 10px 20px;
+  border-radius: 50px;
+  font-family: 'Assistant', sans-serif;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.3s;
+  margin-top: 15px;
+
+  &:hover {
+    border-color: #D4A043;
+    color: #D4A043;
+  }
+`;
+
+const LoginComponent = ({ onLogin }: { onLogin: () => void }) => {
+  const [email, setEmail] = useState('viralytest@test.com');
+  const [password, setPassword] = useState('Test123456!@#');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+
+    try {
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (signInError) {
+        setError(signInError.message);
+        setLoading(false);
+        return;
+      }
+
+      if (data.session) {
+        onLogin();
+      }
+    } catch (err: any) {
+      setError(err.message || 'שגיאה בהתחברות');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <LoginContainer>
+      <LoginTitle>התחברות למערכת</LoginTitle>
+      
+      <TestUserInfo>
+        <h3>📋 פרטי משתמש בדיקה</h3>
+        <p><strong>אימייל:</strong> viralytest@test.com</p>
+        <p><strong>סיסמה:</strong> Test123456!@#</p>
+      </TestUserInfo>
+
+      <LoginForm onSubmit={handleLogin}>
+        <LoginInput
+          type="email"
+          placeholder="אימייל"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+        />
+        <LoginInput
+          type="password"
+          placeholder="סיסמה"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+        />
+        {error && <ErrorMsg>{error}</ErrorMsg>}
+        <LoginButton type="submit" disabled={loading}>
+          {loading ? 'מתחבר...' : 'התחבר'}
+        </LoginButton>
+      </LoginForm>
+    </LoginContainer>
+  );
+};
+
 const App = () => {
   const [activeTrack, setActiveTrack] = useState<TrackId>('actors');
   const [selectedExperts, setSelectedExperts] = useState<string[]>([]);
@@ -1417,6 +1614,8 @@ const App = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalTab, setModalTab] = useState('actors');
   const [hasPremiumAccess] = useState(true); // Placeholder for future premium gating logic
+  const [user, setUser] = useState<any>(null);
+  const [checkingAuth, setCheckingAuth] = useState(true);
   
   // Results
   const [result, setResult] = useState<AnalysisResult | null>(null);
@@ -1428,10 +1627,39 @@ const App = () => {
   const pdfInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
 
+  // Check authentication on mount
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        setUser(session.user);
+      }
+      setCheckingAuth(false);
+    };
+    checkAuth();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        setUser(session.user);
+      } else {
+        setUser(null);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
   useEffect(() => {
     const defaults = EXPERTS_BY_TRACK[activeTrack].slice(0, 3).map(e => e.title);
     setSelectedExperts(defaults);
   }, [activeTrack]);
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setUser(null);
+  };
 
   const handleTrackChange = (id: string) => {
     setActiveTrack(id as TrackId);
@@ -1906,6 +2134,30 @@ const ai = new GoogleGenAI({ apiKey });
     return selectedExperts.length === currentExpertsList.length;
   };
 
+  if (checkingAuth) {
+    return (
+      <>
+        <GlobalStyle />
+        <AppContainer>
+          <div style={{ textAlign: 'center', color: '#D4A043', marginTop: '100px' }}>
+            בודק התחברות...
+          </div>
+        </AppContainer>
+      </>
+    );
+  }
+
+  if (!user) {
+    return (
+      <>
+        <GlobalStyle />
+        <AppContainer>
+          <LoginComponent onLogin={() => setCheckingAuth(true)} />
+        </AppContainer>
+      </>
+    );
+  }
+
   return (
     <>
       <GlobalStyle />
@@ -1918,6 +2170,10 @@ const ai = new GoogleGenAI({ apiKey });
             סוכן על שמשלב ריאליטי, קולנוע, מוזיקה ומשפיענים.<br/>
             קבל ניתוח עומק, הערות מקצועיות וליווי עד לפריצה הגדולה.
           </Description>
+          <UserInfo>
+            <p>מחובר כ: <strong>{user.email}</strong></p>
+            <LogoutButton onClick={handleLogout}>התנתק</LogoutButton>
+          </UserInfo>
           <CTAButton onClick={() => document.getElementById('upload-section')?.scrollIntoView({ behavior: 'smooth' })}>
             העלה סרטון וקבל ניתוח מלא
           </CTAButton>
@@ -2143,4 +2399,8 @@ const ai = new GoogleGenAI({ apiKey });
 };
 
 const root = createRoot(document.getElementById('root')!);
-root.render(<App />);
+root.render(
+  <SubscriptionProvider>
+    <App />
+  </SubscriptionProvider>
+);

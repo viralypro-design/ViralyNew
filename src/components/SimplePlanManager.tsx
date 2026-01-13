@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import styled from 'styled-components';
 import { useSubscription } from '@/context/SubscriptionProvider';
 import { usePlanAccess } from '@/hooks/usePlanAccess';
-import { PLAN_CONFIG } from '@/config/planConfig';
+import { PLAN_CONFIG, ACTIVE_PLANS } from '@/config/planConfig';
 import { PlanType } from '@/types/subscription';
 
 const Container = styled.div`
@@ -284,7 +284,7 @@ WHERE user_id = '${subscription.user_id}';`;
       </h3>
 
       <PlansGrid>
-        {(Object.keys(PLAN_CONFIG) as PlanType[]).map((planType) => {
+        {ACTIVE_PLANS.map((planType) => {
           const isActive = subscription.plan_type === planType;
           const plan = PLAN_CONFIG[planType];
           const canSelect = !isActive;

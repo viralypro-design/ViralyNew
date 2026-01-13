@@ -17,6 +17,23 @@ export interface PlanConfig {
 }
 
 /**
+ * חבילות פעילות - רק אלה זמינות כרגע
+ */
+export const ACTIVE_PLANS: ReadonlyArray<PlanType> = [
+  'trial',
+  'creators',
+  'creators_extreme',
+] as const;
+
+/**
+ * חבילות מושבתות - לא זמינות כרגע
+ */
+export const DISABLED_PLANS: ReadonlyArray<PlanType> = [
+  'coach',
+  'coach_pro',
+] as const;
+
+/**
  * קונפיגורציה מרכזית של כל החבילות
  * Single Source of Truth - כל השינויים נעשים כאן בלבד
  * הקונפיג הוא read-only כדי למנוע שינויים בצד לקוח

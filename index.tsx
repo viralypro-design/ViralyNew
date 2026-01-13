@@ -5,7 +5,11 @@ import { GoogleGenAI } from "@google/genai";
 import { SubscriptionProvider, useSubscription } from '@/context/SubscriptionProvider';
 import { supabase } from '@/lib/supabaseClient';
 import { SimplePlanManager } from '@/components/SimplePlanManager';
+import { SignUpComponent } from '@/components/SignUpComponent';
+import { PlansInfoModal } from '@/components/PlansInfoModal';
 import { usePlanAccess } from '@/hooks/usePlanAccess';
+import { PLAN_CONFIG } from '@/config/planConfig';
+import { PlanType } from '@/types/subscription';
 import './index.css';
 
 // --- Types ---
@@ -1546,7 +1550,27 @@ const LogoutButton = styled.button`
   }
 `;
 
-const LoginComponent = ({ onLogin }: { onLogin: () => void }) => {
+const SwitchModeButton = styled.button`
+  background: transparent;
+  border: 1px solid #888;
+  color: #ccc;
+  padding: 10px 20px;
+  border-radius: 50px;
+  font-family: 'Assistant', sans-serif;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.3s;
+  margin-top: 15px;
+  width: 100%;
+
+  &:hover {
+    border-color: #D4A043;
+    color: #D4A043;
+  }
+`;
+
+const LoginComponent = ({ onLogin, onSwitchToSignUp }: { onLogin: () => void; onSwitchToSignUp: () => void }) => {
   const [email, setEmail] = useState('viralytest@test.com');
   const [password, setPassword] = useState('Test123456!@#');
   const [loading, setLoading] = useState(false);
@@ -1703,6 +1727,10 @@ const LoginComponent = ({ onLogin }: { onLogin: () => void }) => {
           {loading ? 'מתחבר...' : 'התחבר'}
         </LoginButton>
       </LoginForm>
+      
+      <SwitchModeButton onClick={onSwitchToSignUp}>
+        אין לך חשבון? הירשם כאן
+      </SwitchModeButton>
     </LoginContainer>
   );
 };
@@ -1716,13 +1744,36 @@ const App = () => {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isPlansModalOpen, setIsPlansModalOpen] = useState(false);
   const [modalTab, setModalTab] = useState('actors');
   const [user, setUser] = useState<any>(null);
   const [checkingAuth, setCheckingAuth] = useState(true);
+  const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
   
   // Subscription and plan access
   const { subscription, loading: subscriptionLoading } = useSubscription();
   const planAccess = usePlanAccess(subscription);
+  
+  const handleUpgradePlan = async (newPlan: PlanType) => {
+    if (!subscription) return;
+    
+    try {
+      const { data, error } = await supabase.rpc('update_user_plan_type', {
+        new_plan_type: newPlan
+      });
+      
+      if (error) {
+        alert(`שגיאה בשדרוג החבילה: ${error.message}`);
+      } else if (data?.success) {
+        alert(`החבילה שודרגה ל-${PLAN_CONFIG[newPlan].label}!`);
+        setIsPlansModalOpen(false);
+        // Refresh subscription
+        window.location.reload();
+      }
+    } catch (err: any) {
+      alert(`שגיאה: ${err.message}`);
+    }
+  };
   
   // Results
   const [result, setResult] = useState<AnalysisResult | null>(null);
@@ -2317,18 +2368,38 @@ const ai = new GoogleGenAI({ apiKey });
       <>
         <GlobalStyle />
         <AppContainer>
-          <LoginComponent onLogin={() => {
-            setCheckingAuth(true);
-            // Refresh after login
-            setTimeout(() => {
-              supabase.auth.getSession().then(({ data: { session } }) => {
-                if (session?.user) {
-                  setUser(session.user);
-                }
-                setCheckingAuth(false);
-              });
-            }, 500);
-          }} />
+          {authMode === 'login' ? (
+            <LoginComponent 
+              onLogin={() => {
+                setCheckingAuth(true);
+                // Refresh after login
+                setTimeout(() => {
+                  supabase.auth.getSession().then(({ data: { session } }) => {
+                    if (session?.user) {
+                      setUser(session.user);
+                    }
+                    setCheckingAuth(false);
+                  });
+                }, 500);
+              }}
+              onSwitchToSignUp={() => setAuthMode('signup')}
+            />
+          ) : (
+            <SignUpComponent
+              onSignUp={() => {
+                setCheckingAuth(true);
+                setTimeout(() => {
+                  supabase.auth.getSession().then(({ data: { session } }) => {
+                    if (session?.user) {
+                      setUser(session.user);
+                    }
+                    setCheckingAuth(false);
+                  });
+                }, 500);
+              }}
+              onSwitchToLogin={() => setAuthMode('login')}
+            />
+          )}
         </AppContainer>
       </>
     );
@@ -2352,12 +2423,16 @@ const ai = new GoogleGenAI({ apiKey });
               🚪 התנתק
             </LogoutButton>
           </UserInfo>
+          <div style={{ width: '100%', height: '1px', background: '#333', margin: '20px 0' }}></div>
           <CTAButton onClick={() => document.getElementById('upload-section')?.scrollIntoView({ behavior: 'smooth' })}>
             העלה סרטון וקבל ניתוח מלא
           </CTAButton>
           
           <CapabilitiesButton onClick={() => setIsModalOpen(true)}>
              יכולות האפליקציה של סוכן העל <SparklesIcon />
+          </CapabilitiesButton>
+          <CapabilitiesButton onClick={() => setIsPlansModalOpen(true)} style={{ marginTop: '10px' }}>
+             📦 חבילות והצעות
           </CapabilitiesButton>
         </Header>
         
@@ -2366,6 +2441,13 @@ const ai = new GoogleGenAI({ apiKey });
           onClose={() => setIsModalOpen(false)}
           activeTab={modalTab}
           setActiveTab={setModalTab}
+        />
+        
+        <PlansInfoModal
+          isOpen={isPlansModalOpen}
+          onClose={() => setIsPlansModalOpen(false)}
+          currentPlan={subscription?.plan_type}
+          onUpgrade={handleUpgradePlan}
         />
 
         <SimplePlanManager />

@@ -4,6 +4,7 @@ import styled, { createGlobalStyle, keyframes, css } from 'styled-components';
 import { GoogleGenAI } from "@google/genai";
 import { SubscriptionProvider } from '@/context/SubscriptionProvider';
 import { supabase } from '@/lib/supabaseClient';
+import { PlanTester } from '@/components/PlanTester';
 import './index.css';
 
 // --- Types ---

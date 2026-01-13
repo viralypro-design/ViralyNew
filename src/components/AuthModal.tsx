@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import styled, { keyframes } from 'styled-components';
 import { supabase } from '@/lib/supabaseClient';
 import { PLAN_CONFIG, ACTIVE_PLANS } from '@/config/planConfig';

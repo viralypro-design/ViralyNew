@@ -292,9 +292,16 @@ export const PlansInfoModal: React.FC<PlansInfoModalProps> = ({
                     </li>
                   </FeatureList>
                   
-                  {onUpgrade && !isCurrent && (
+                  {!isCurrent && (
                     <button
-                      onClick={() => onUpgrade(planType)}
+                      onClick={() => {
+                        if (onSignUpWithPlan) {
+                          // אם יש משתמש - שדרג, אם לא - הרשמה
+                          onSignUpWithPlan(planType);
+                        } else if (onUpgrade) {
+                          onUpgrade(planType);
+                        }
+                      }}
                       style={{
                         width: '100%',
                         marginTop: '20px',
@@ -314,7 +321,7 @@ export const PlansInfoModal: React.FC<PlansInfoModalProps> = ({
                         e.currentTarget.style.transform = 'scale(1)';
                       }}
                     >
-                      🔄 שדרג לחבילה זו
+                      {onSignUpWithPlan ? '📝 הרשמה לחבילה זו' : '🔄 שדרג לחבילה זו'}
                     </button>
                   )}
                 </PlanCard>

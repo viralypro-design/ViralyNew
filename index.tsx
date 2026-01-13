@@ -1834,9 +1834,21 @@ const App = () => {
   };
 
   const handleTrackChange = (id: string) => {
-    // בדוק אם יש הרשאה לבחור תחום
+    // כשלא מחובר - אפשר לעבור בין כל התחומים
+    if (!user) {
+      setActiveTrack(id as TrackId);
+      setResult(null);
+      setPreviousResult(null);
+      setIsImprovementMode(false);
+      if (['actors', 'musicians', 'creators', 'influencers'].includes(id)) {
+        setModalTab(id);
+      }
+      return;
+    }
+    
+    // כשיש משתמש - בדוק אם יש הרשאה לבחור תחום
     if (!planAccess) {
-      alert('אין הרשאה. נא להתחבר או לבדוק את החבילה שלך.');
+      alert('אין הרשאה. נא לבדוק את החבילה שלך.');
       return;
     }
     
@@ -2746,8 +2758,9 @@ const ai = new GoogleGenAI({ apiKey });
           />
           <ActionButton 
             onClick={() => {
-              // אם לא מחובר - פתח חלון חבילות
+              // אם לא מחובר - הסבר ופתח חלון חבילות
               if (!user) {
+                alert('כדי להריץ ניתוח, נא להתחבר או להירשם ולבחור חבילה מתאימה.');
                 setIsPlansModalOpen(true);
                 return;
               }

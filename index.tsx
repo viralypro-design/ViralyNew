@@ -2413,8 +2413,24 @@ const ai = new GoogleGenAI({ apiKey });
              )}
            </ExpertControlText>
            <ExpertToggleGroup>
-              <ExpertToggleButton $active={isTop3()} onClick={handleSetTop3}>3 המובילים</ExpertToggleButton>
-              <ExpertToggleButton $active={isAll()} onClick={handleSetAll}>כל המומחים</ExpertToggleButton>
+              <ExpertToggleButton 
+                $active={isTop3()} 
+                onClick={handleSetTop3}
+                disabled={!planAccess}
+              >
+                3 המובילים
+              </ExpertToggleButton>
+              <ExpertToggleButton 
+                $active={isAll()} 
+                onClick={handleSetAll}
+                disabled={!planAccess || (planAccess?.maxExperts || 0) <= 3}
+                style={{
+                  opacity: (!planAccess || (planAccess?.maxExperts || 0) <= 3) ? 0.4 : 1,
+                  cursor: (!planAccess || (planAccess?.maxExperts || 0) <= 3) ? 'not-allowed' : 'pointer'
+                }}
+              >
+                {planAccess && planAccess.maxExperts > 3 ? 'כל המומחים' : `${planAccess?.maxExperts || 3} מומחים`}
+              </ExpertToggleButton>
            </ExpertToggleGroup>
         </ExpertControlBar>
 

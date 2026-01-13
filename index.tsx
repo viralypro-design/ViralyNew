@@ -2376,7 +2376,12 @@ const ai = new GoogleGenAI({ apiKey });
             סוכן על שמשלב ריאליטי, קולנוע, מוזיקה ומשפיענים.<br/>
             קבל ניתוח עומק, הערות מקצועיות וליווי עד לפריצה הגדולה.
           </Description>
-          <div style={{ width: '100%', height: '1px', background: '#333', margin: '20px 0' }}></div>
+          <div style={{ 
+            width: '200px', 
+            height: '1px', 
+            background: '#333', 
+            margin: '10px auto 30px auto'
+          }}></div>
           {user ? (
             <UserInfo>
               <p>מחובר כ: <strong>{user.email}</strong></p>
@@ -2385,13 +2390,20 @@ const ai = new GoogleGenAI({ apiKey });
               </LogoutButton>
             </UserInfo>
           ) : (
-            <div style={{ textAlign: 'center', marginTop: '10px' }}>
+            <div style={{ textAlign: 'center', marginBottom: '40px' }}>
               <CTAButton onClick={() => setIsAuthModalOpen(true)}>
                 🔐 התחבר / הרשם
               </CTAButton>
             </div>
           )}
-          <CTAButton onClick={() => document.getElementById('upload-section')?.scrollIntoView({ behavior: 'smooth' })}>
+          <CTAButton onClick={() => {
+            // אם המשתמש לא מחובר או אין לו חבילה מתאימה, העבר לבחירת חבילה
+            if (!user || !planAccess || !planAccess.canRunAnalysis()) {
+              setIsPlansModalOpen(true);
+            } else {
+              document.getElementById('upload-section')?.scrollIntoView({ behavior: 'smooth' });
+            }
+          }}>
             העלה סרטון וקבל ניתוח מלא
           </CTAButton>
           
@@ -2433,7 +2445,6 @@ const ai = new GoogleGenAI({ apiKey });
           }}
         />
 
-        <SimplePlanManager />
 
         <SectionLabel>בחר את מסלול הניתוח שלך:</SectionLabel>
         {!user && (

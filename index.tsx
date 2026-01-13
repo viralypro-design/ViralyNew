@@ -1541,6 +1541,7 @@ const LoginComponent = ({ onLogin }: { onLogin: () => void }) => {
   const [password, setPassword] = useState('Test123456!@#');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [creatingUser, setCreatingUser] = useState(false);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1548,83 +1549,109 @@ const LoginComponent = ({ onLogin }: { onLogin: () => void }) => {
     setError(null);
 
     try {
-      // נסה להתחבר
+      // נסה להתחבר קודם
       const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
       if (signInError) {
-        // אם המשתמש לא קיים, נסה ליצור אותו
-        if (signInError.message.includes('Invalid login credentials') || signInError.message.includes('Email not confirmed')) {
-          console.log('User not found, attempting to create...');
+        // אם המשתמש לא קיים או שגיאת credentials, נסה ליצור אותו
+        if (signInError.message.includes('Invalid login credentials') || 
+            signInError.message.includes('Email not confirmed') ||
+            signInError.message.includes('User not found')) {
+          
+          console.log('User not found or invalid credentials, attempting to create...');
+          setCreatingUser(true);
+          setError('יוצר משתמש חדש...');
+          
           const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
             email,
             password,
             options: {
               data: {
                 plan_type: 'creators', // Set plan_type in metadata for trigger
-              }
+              },
+              emailRedirectTo: window.location.origin
             }
           });
 
           if (signUpError) {
-            // אם גם ה-signup נכשל, נסה שוב signin (אולי המשתמש נוצר אבל לא אומת)
-            if (signUpError.message.includes('already registered')) {
-              // המשתמש קיים, נסה להתחבר שוב
+            // אם המשתמש כבר קיים, נסה להתחבר שוב
+            if (signUpError.message.includes('already registered') || 
+                signUpError.message.includes('User already registered')) {
+              
+              console.log('User already exists, trying to sign in again...');
               const { data: retryData, error: retryError } = await supabase.auth.signInWithPassword({
                 email,
                 password,
               });
               
               if (retryError) {
-                // בדוק אם זו בעיית אימות אימייל
-                if (retryError.message.includes('Email not confirmed') || retryError.message.includes('email_not_confirmed')) {
-                  setError('המשתמש קיים אבל האימייל לא אומת. אנא בדוק את תיבת הדואר או פנה למנהל המערכת לאימות ידני.');
+                if (retryError.message.includes('Email not confirmed') || 
+                    retryError.message.includes('email_not_confirmed')) {
+                  setError('המשתמש קיים אבל האימייל לא אומת. אנא השבית "Email confirmation" ב-Supabase Dashboard או אמת את המשתמש ידנית.');
                 } else {
                   setError(`שגיאה בהתחברות: ${retryError.message}`);
                 }
-              } else if (retryData.session) {
+              } else if (retryData?.session) {
                 onLogin();
+                return;
               }
             } else {
               setError(`שגיאה ביצירת משתמש: ${signUpError.message}`);
             }
+            setCreatingUser(false);
             setLoading(false);
             return;
           }
 
-          // אם ה-signup הצליח, נסה להתחבר
-          if (signUpData.session) {
-            onLogin();
-          } else {
-            // המשתמש נוצר אבל לא אומת - נסה להתחבר שוב (לפעמים Supabase מאמת אוטומטית)
+          // אם ה-signup הצליח
+          if (signUpData?.user) {
+            setCreatingUser(false);
+            console.log('User created successfully:', signUpData.user.id);
+            
+            // אם יש session מיד (אימות אימייל מושבת), התחבר
+            if (signUpData.session) {
+              onLogin();
+              return;
+            }
+            
+            // אם אין session, נסה להתחבר (לפעמים Supabase מאמת אוטומטית)
             const { data: autoSignIn, error: autoSignInError } = await supabase.auth.signInWithPassword({
               email,
               password,
             });
             
             if (autoSignInError) {
-              if (autoSignInError.message.includes('Email not confirmed') || autoSignInError.message.includes('email_not_confirmed')) {
-                setError('המשתמש נוצר בהצלחה! אנא בדוק את תיבת הדואר לאימות האימייל, או פנה למנהל המערכת לאימות ידני.');
+              if (autoSignInError.message.includes('Email not confirmed') || 
+                  autoSignInError.message.includes('email_not_confirmed')) {
+                setError('המשתמש נוצר בהצלחה! אבל האימייל לא אומת. אנא השבית "Email confirmation" ב-Supabase Dashboard (Authentication → Settings) או אמת את המשתמש ידנית.');
               } else {
-                setError(`המשתמש נוצר אבל לא ניתן להתחבר: ${autoSignInError.message}`);
+                setError(`המשתמש נוצר אבל לא ניתן להתחבר: ${autoSignInError.message}. נסה להתחבר שוב בעוד רגע.`);
               }
-            } else if (autoSignIn.session) {
+            } else if (autoSignIn?.session) {
               onLogin();
+              return;
             }
+          } else {
+            setError('המשתמש לא נוצר. נסה שוב או פנה למנהל המערכת.');
+            setCreatingUser(false);
           }
         } else {
           setError(`שגיאה בהתחברות: ${signInError.message}`);
         }
+        setCreatingUser(false);
         setLoading(false);
         return;
       }
 
-      if (signInData.session) {
+      // אם ההתחברות הצליחה
+      if (signInData?.session) {
         onLogin();
       }
     } catch (err: any) {
+      console.error('Login error:', err);
       setError(err.message || 'שגיאה בהתחברות');
     } finally {
       setLoading(false);

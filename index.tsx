@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { SimplePlanManager } from '@/components/SimplePlanManager';
 import { SignUpComponent } from '@/components/SignUpComponent';
 import { PlansInfoModal } from '@/components/PlansInfoModal';
+import { AuthModal } from '@/components/AuthModal';
 import { usePlanAccess } from '@/hooks/usePlanAccess';
 import { PLAN_CONFIG } from '@/config/planConfig';
 import { PlanType } from '@/types/subscription';
@@ -1745,10 +1746,10 @@ const App = () => {
   const [loading, setLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isPlansModalOpen, setIsPlansModalOpen] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [modalTab, setModalTab] = useState('actors');
   const [user, setUser] = useState<any>(null);
   const [checkingAuth, setCheckingAuth] = useState(true);
-  const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
   
   // Subscription and plan access
   const { subscription, loading: subscriptionLoading } = useSubscription();
@@ -2326,7 +2327,7 @@ const ai = new GoogleGenAI({ apiKey });
   const minExperts = 3;
   const maxExperts = planAccess?.maxExperts || 8;
   const hasEnoughExperts = selectedExperts.length >= minExperts && selectedExperts.length <= maxExperts;
-  const isReady = (!!prompt || !!file) && hasEnoughExperts && planAccess?.canRunAnalysis() && planAccess?.hasMinutesLeft();
+  const isReady = user && (!!prompt || !!file) && hasEnoughExperts && planAccess?.canRunAnalysis() && planAccess?.hasMinutesLeft();
 
   const currentExpertsList = EXPERTS_BY_TRACK[activeTrack];
   
@@ -2363,48 +2364,6 @@ const ai = new GoogleGenAI({ apiKey });
     );
   }
 
-  if (!user) {
-    return (
-      <>
-        <GlobalStyle />
-        <AppContainer>
-          {authMode === 'login' ? (
-            <LoginComponent 
-              onLogin={() => {
-                setCheckingAuth(true);
-                // Refresh after login
-                setTimeout(() => {
-                  supabase.auth.getSession().then(({ data: { session } }) => {
-                    if (session?.user) {
-                      setUser(session.user);
-                    }
-                    setCheckingAuth(false);
-                  });
-                }, 500);
-              }}
-              onSwitchToSignUp={() => setAuthMode('signup')}
-            />
-          ) : (
-            <SignUpComponent
-              onSignUp={() => {
-                setCheckingAuth(true);
-                setTimeout(() => {
-                  supabase.auth.getSession().then(({ data: { session } }) => {
-                    if (session?.user) {
-                      setUser(session.user);
-                    }
-                    setCheckingAuth(false);
-                  });
-                }, 500);
-              }}
-              onSwitchToLogin={() => setAuthMode('login')}
-            />
-          )}
-        </AppContainer>
-      </>
-    );
-  }
-
   return (
     <>
       <GlobalStyle />
@@ -2417,13 +2376,21 @@ const ai = new GoogleGenAI({ apiKey });
             סוכן על שמשלב ריאליטי, קולנוע, מוזיקה ומשפיענים.<br/>
             קבל ניתוח עומק, הערות מקצועיות וליווי עד לפריצה הגדולה.
           </Description>
-          <UserInfo>
-            <p>מחובר כ: <strong>{user.email}</strong></p>
-            <LogoutButton onClick={handleLogout}>
-              🚪 התנתק
-            </LogoutButton>
-          </UserInfo>
           <div style={{ width: '100%', height: '1px', background: '#333', margin: '20px 0' }}></div>
+          {user ? (
+            <UserInfo>
+              <p>מחובר כ: <strong>{user.email}</strong></p>
+              <LogoutButton onClick={handleLogout}>
+                🚪 התנתק
+              </LogoutButton>
+            </UserInfo>
+          ) : (
+            <div style={{ textAlign: 'center', marginTop: '10px' }}>
+              <CTAButton onClick={() => setIsAuthModalOpen(true)}>
+                🔐 התחבר / הרשם
+              </CTAButton>
+            </div>
+          )}
           <CTAButton onClick={() => document.getElementById('upload-section')?.scrollIntoView({ behavior: 'smooth' })}>
             העלה סרטון וקבל ניתוח מלא
           </CTAButton>
@@ -2448,6 +2415,22 @@ const ai = new GoogleGenAI({ apiKey });
           onClose={() => setIsPlansModalOpen(false)}
           currentPlan={subscription?.plan_type}
           onUpgrade={handleUpgradePlan}
+        />
+        
+        <AuthModal
+          isOpen={isAuthModalOpen}
+          onClose={() => setIsAuthModalOpen(false)}
+          onSuccess={() => {
+            setCheckingAuth(true);
+            setTimeout(() => {
+              supabase.auth.getSession().then(({ data: { session } }) => {
+                if (session?.user) {
+                  setUser(session.user);
+                }
+                setCheckingAuth(false);
+              });
+            }, 500);
+          }}
         />
 
         <SimplePlanManager />
@@ -2658,13 +2641,16 @@ const ai = new GoogleGenAI({ apiKey });
           {!planAccess && (
             <ErrorMsg>אין הרשאה להריץ ניתוח. נא להתחבר או לבדוק את החבילה שלך.</ErrorMsg>
           )}
-          {planAccess && !planAccess.canRunAnalysis() && (
+          {!user && (
+            <ErrorMsg>נא להתחבר או להירשם כדי להריץ ניתוח</ErrorMsg>
+          )}
+          {user && planAccess && !planAccess.canRunAnalysis() && (
             <ErrorMsg>הגעת למכסת הניתוחים החודשית. שדרג את החבילה להמשך.</ErrorMsg>
           )}
-          {planAccess && !planAccess.hasMinutesLeft() && (
+          {user && planAccess && !planAccess.hasMinutesLeft() && (
             <ErrorMsg>הגעת למכסת הדקות החודשית. שדרג את החבילה להמשך.</ErrorMsg>
           )}
-          {planAccess && selectedExperts.length < 3 && (
+          {user && planAccess && selectedExperts.length < 3 && (
             <ErrorMsg>נא לבחור לפחות 3 מומחים כדי להמשיך</ErrorMsg>
           )}
         </InputWrapper>

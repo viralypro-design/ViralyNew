@@ -2281,13 +2281,19 @@ const ai = new GoogleGenAI({ apiKey });
   };
 
   const isTop3 = () => {
-    const top3 = currentExpertsList.slice(0, 3).map(e => e.title);
-    if (selectedExperts.length !== 3) return false;
-    return top3.every(t => selectedExperts.includes(t));
+    if (!planAccess) return false;
+    const maxExperts = planAccess.maxExperts;
+    const top3 = currentExpertsList.slice(0, Math.min(3, maxExperts)).map(e => e.title);
+    return selectedExperts.length === top3.length && 
+           selectedExperts.every((exp, i) => exp === top3[i]);
   };
 
   const isAll = () => {
-    return selectedExperts.length === currentExpertsList.length;
+    if (!planAccess) return false;
+    const maxExperts = planAccess.maxExperts;
+    const all = currentExpertsList.slice(0, maxExperts).map(e => e.title);
+    return selectedExperts.length === all.length && 
+           selectedExperts.every((exp, i) => exp === all[i]);
   };
 
   if (checkingAuth) {

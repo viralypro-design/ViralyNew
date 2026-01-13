@@ -2436,9 +2436,14 @@ const ai = new GoogleGenAI({ apiKey });
         <SimplePlanManager />
 
         <SectionLabel>בחר את מסלול הניתוח שלך:</SectionLabel>
-        {!planAccess && (
+        {!user && (
           <ErrorMsg style={{ textAlign: 'center', marginBottom: '20px' }}>
-            אין הרשאה. נא להתחבר או לבדוק את החבילה שלך.
+            נא להתחבר או להירשם כדי להשתמש באפליקציה
+          </ErrorMsg>
+        )}
+        {user && !planAccess && (
+          <ErrorMsg style={{ textAlign: 'center', marginBottom: '20px' }}>
+            אין הרשאה. נא לבדוק את החבילה שלך.
           </ErrorMsg>
         )}
         <Grid>

@@ -1774,6 +1774,13 @@ const App = () => {
       return;
     }
     
+    // רק creators_extreme יכול לשנות תחום (maxTracks > 1)
+    // trial ו-creators מוגבלים לתחום אחד בלבד
+    if (planAccess.maxTracks <= 1 && activeTrack !== id) {
+      alert(`החבילה שלך מוגבלת לתחום אחד בלבד. שדרג ל"יוצרים באקסטרים" כדי לגשת לכל התחומים.`);
+      return;
+    }
+    
     setActiveTrack(id as TrackId);
     setResult(null);
     setPreviousResult(null);
@@ -2490,7 +2497,11 @@ const ai = new GoogleGenAI({ apiKey });
               <UploadTitle>
                 {isImprovementMode ? 'העלה טייק משופר (ניסיון 2)' : `העלה סרטון ${TRACKS.find(t => t.id === activeTrack)?.label}`}
               </UploadTitle>
-              <UploadSubtitle>עד 5 דקות או 20MB</UploadSubtitle>
+              <UploadSubtitle>
+                {planAccess 
+                  ? `עד ${planAccess.maxVideoMinutes} דקות או ${planAccess.maxVideoMB}MB`
+                  : 'עד 5 דקות או 20MB'}
+              </UploadSubtitle>
               
               <UploadButton>
                 {isImprovementMode ? 'בחר קובץ לשיפור' : 'העלה סרטון עכשיו'}

@@ -2311,8 +2311,6 @@ const ai = new GoogleGenAI({ apiKey });
   const isAll = () => {
     if (!planAccess) return false;
     const maxExperts = planAccess.maxExperts;
-    // בחבילת ניסיון - לא יכול להיות במצב "כל המומחים"
-    if (maxExperts <= 3) return false;
     const all = currentExpertsList.slice(0, maxExperts).map(e => e.title);
     // בדוק אם כל המומחים שנבחרו הם בדיוק כל המומחים
     if (selectedExperts.length !== all.length) return false;

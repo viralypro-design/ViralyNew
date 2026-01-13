@@ -69,12 +69,14 @@ WHERE user_id = (
 );
 ```
 
-#### אפשרויות ל-plan_type:
+#### אפשרויות ל-plan_type (זמינות כרגע):
 - `'trial'` - ניסיון
 - `'creators'` - יוצרים
 - `'creators_extreme'` - יוצרים באקסטרים
-- `'coach'` - מאמנים וסוכנויות
-- `'coach_pro'` - מאמנים וסוכנויות PRO
+
+#### חבילות מושבתות (לא זמינות כרגע):
+- `'coach'` - מאמנים וסוכנויות (מושבת)
+- `'coach_pro'` - מאמנים וסוכנויות PRO (מושבת)
 
 #### שלב 3: בדוק שהשינוי בוצע
 ```sql
@@ -131,8 +133,9 @@ WHERE user_id = (SELECT id FROM auth.users WHERE email = 'viralytest@test.com');
 - ✅ Advanced analysis
 - ✅ Compare videos
 
-### 4. בדוק חבילת Coach
+### 4. בדוק חבילת Coach (מושבת כרגע)
 ```sql
+-- הערה: חבילה זו מושבתת כרגע ולא זמינה בממשק
 UPDATE public.user_subscriptions 
 SET plan_type = 'coach' 
 WHERE user_id = (SELECT id FROM auth.users WHERE email = 'viralytest@test.com');
@@ -145,8 +148,9 @@ WHERE user_id = (SELECT id FROM auth.users WHERE email = 'viralytest@test.com');
 - ✅ Students management
 - ✅ עד 10 תלמידים
 
-### 5. בדוק חבילת Coach Pro
+### 5. בדוק חבילת Coach Pro (מושבת כרגע)
 ```sql
+-- הערה: חבילה זו מושבתת כרגע ולא זמינה בממשק
 UPDATE public.user_subscriptions 
 SET plan_type = 'coach_pro' 
 WHERE user_id = (SELECT id FROM auth.users WHERE email = 'viralytest@test.com');

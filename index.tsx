@@ -2729,7 +2729,20 @@ const ai = new GoogleGenAI({ apiKey });
             onChange={(e) => setPrompt(e.target.value)}
           />
           <ActionButton 
-            onClick={handleGenerate} 
+            onClick={() => {
+              // אם לא מחובר - פתח חלון חבילות
+              if (!user) {
+                setIsPlansModalOpen(true);
+                return;
+              }
+              // אם יש משתמש אבל אין הרשאה - פתח חלון חבילות
+              if (!planAccess || !planAccess.canRunAnalysis() || !planAccess.hasMinutesLeft()) {
+                setIsPlansModalOpen(true);
+                return;
+              }
+              // אחרת - הרץ ניתוח
+              handleGenerate();
+            }}
             disabled={loading || !isReady}
             $isReady={isReady}
             $isLoading={loading}

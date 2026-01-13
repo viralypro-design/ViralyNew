@@ -1565,14 +1565,14 @@ const LoginComponent = ({ onLogin }: { onLogin: () => void }) => {
           setCreatingUser(true);
           setError('יוצר משתמש חדש...');
           
+          // נסה ליצור משתמש - בלי emailRedirectTo כי זה יכול לגרום לבעיות
           const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-            email,
+            email: email.trim().toLowerCase(), // ודא שהאימייל תקין
             password,
             options: {
               data: {
                 plan_type: 'creators', // Set plan_type in metadata for trigger
-              },
-              emailRedirectTo: window.location.origin
+              }
             }
           });
 
@@ -1599,7 +1599,12 @@ const LoginComponent = ({ onLogin }: { onLogin: () => void }) => {
                 return;
               }
             } else {
-              setError(`שגיאה ביצירת משתמש: ${signUpError.message}`);
+              // בדוק אם זו שגיאת email invalid
+              if (signUpError.message.includes('invalid') || signUpError.message.includes('Invalid')) {
+                setError(`האימייל לא תקין או חסום ב-Supabase. נסה אימייל אחר (למשל: viralytest@gmail.com) או צור את המשתמש ידנית ב-Supabase Dashboard → Authentication → Users`);
+              } else {
+                setError(`שגיאה ביצירת משתמש: ${signUpError.message}. נסה ליצור את המשתמש ידנית ב-Supabase Dashboard.`);
+              }
             }
             setCreatingUser(false);
             setLoading(false);

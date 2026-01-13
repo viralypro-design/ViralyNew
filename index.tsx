@@ -1548,18 +1548,80 @@ const LoginComponent = ({ onLogin }: { onLogin: () => void }) => {
     setError(null);
 
     try {
-      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+      // נסה להתחבר
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
       if (signInError) {
-        setError(signInError.message);
+        // אם המשתמש לא קיים, נסה ליצור אותו
+        if (signInError.message.includes('Invalid login credentials') || signInError.message.includes('Email not confirmed')) {
+          console.log('User not found, attempting to create...');
+          const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+            email,
+            password,
+            options: {
+              data: {
+                plan_type: 'creators', // Set plan_type in metadata for trigger
+              }
+            }
+          });
+
+          if (signUpError) {
+            // אם גם ה-signup נכשל, נסה שוב signin (אולי המשתמש נוצר אבל לא אומת)
+            if (signUpError.message.includes('already registered')) {
+              // המשתמש קיים, נסה להתחבר שוב
+              const { data: retryData, error: retryError } = await supabase.auth.signInWithPassword({
+                email,
+                password,
+              });
+              
+              if (retryError) {
+                // בדוק אם זו בעיית אימות אימייל
+                if (retryError.message.includes('Email not confirmed') || retryError.message.includes('email_not_confirmed')) {
+                  setError('המשתמש קיים אבל האימייל לא אומת. אנא בדוק את תיבת הדואר או פנה למנהל המערכת לאימות ידני.');
+                } else {
+                  setError(`שגיאה בהתחברות: ${retryError.message}`);
+                }
+              } else if (retryData.session) {
+                onLogin();
+              }
+            } else {
+              setError(`שגיאה ביצירת משתמש: ${signUpError.message}`);
+            }
+            setLoading(false);
+            return;
+          }
+
+          // אם ה-signup הצליח, נסה להתחבר
+          if (signUpData.session) {
+            onLogin();
+          } else {
+            // המשתמש נוצר אבל לא אומת - נסה להתחבר שוב (לפעמים Supabase מאמת אוטומטית)
+            const { data: autoSignIn, error: autoSignInError } = await supabase.auth.signInWithPassword({
+              email,
+              password,
+            });
+            
+            if (autoSignInError) {
+              if (autoSignInError.message.includes('Email not confirmed') || autoSignInError.message.includes('email_not_confirmed')) {
+                setError('המשתמש נוצר בהצלחה! אנא בדוק את תיבת הדואר לאימות האימייל, או פנה למנהל המערכת לאימות ידני.');
+              } else {
+                setError(`המשתמש נוצר אבל לא ניתן להתחבר: ${autoSignInError.message}`);
+              }
+            } else if (autoSignIn.session) {
+              onLogin();
+            }
+          }
+        } else {
+          setError(`שגיאה בהתחברות: ${signInError.message}`);
+        }
         setLoading(false);
         return;
       }
 
-      if (data.session) {
+      if (signInData.session) {
         onLogin();
       }
     } catch (err: any) {

@@ -2276,6 +2276,11 @@ const ai = new GoogleGenAI({ apiKey });
       return;
     }
     const maxExperts = planAccess.maxExperts;
+    // בחבילת ניסיון - לא ניתן לבחור "כל המומחים" (רק 3)
+    if (maxExperts <= 3) {
+      return; // לא עושה כלום בחבילת ניסיון
+    }
+    // בחבילת יוצרים ויוצרים באקסטרים - כל 8 המומחים
     const all = currentExpertsList.slice(0, maxExperts).map(e => e.title);
     setSelectedExperts(all);
   };
@@ -2424,10 +2429,6 @@ const ai = new GoogleGenAI({ apiKey });
                 $active={isAll()} 
                 onClick={handleSetAll}
                 disabled={!planAccess || (planAccess?.maxExperts || 0) <= 3}
-                style={{
-                  opacity: (!planAccess || (planAccess?.maxExperts || 0) <= 3) ? 0.4 : 1,
-                  cursor: (!planAccess || (planAccess?.maxExperts || 0) <= 3) ? 'not-allowed' : 'pointer'
-                }}
               >
                 {planAccess && planAccess.maxExperts > 3 ? 'כל המומחים' : `${planAccess?.maxExperts || 3} מומחים`}
               </ExpertToggleButton>

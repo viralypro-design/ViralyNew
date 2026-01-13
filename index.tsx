@@ -2328,7 +2328,11 @@ const ai = new GoogleGenAI({ apiKey });
   const minExperts = 3;
   const maxExperts = planAccess?.maxExperts || 8;
   const hasEnoughExperts = selectedExperts.length >= minExperts && selectedExperts.length <= maxExperts;
-  const isReady = user && (!!prompt || !!file) && hasEnoughExperts && planAccess?.canRunAnalysis() && planAccess?.hasMinutesLeft();
+  // כשלא מחובר - תמיד מוכן (אבל יפתח חלון חבילות בלחיצה)
+  // כשיש משתמש - בדוק הגבלות
+  const isReady = !user 
+    ? (!!prompt || !!file) && hasEnoughExperts
+    : (!!prompt || !!file) && hasEnoughExperts && planAccess?.canRunAnalysis() && planAccess?.hasMinutesLeft();
 
   const currentExpertsList = EXPERTS_BY_TRACK[activeTrack];
   
@@ -2485,11 +2489,6 @@ const ai = new GoogleGenAI({ apiKey });
 
 
         <SectionLabel>בחר את מסלול הניתוח שלך:</SectionLabel>
-        {!user && (
-          <ErrorMsg style={{ textAlign: 'center', marginBottom: '20px' }}>
-            נא להתחבר או להירשם כדי להשתמש באפליקציה
-          </ErrorMsg>
-        )}
         {user && !planAccess && (
           <ErrorMsg style={{ textAlign: 'center', marginBottom: '20px' }}>
             אין הרשאה. נא לבדוק את החבילה שלך.
@@ -2497,8 +2496,28 @@ const ai = new GoogleGenAI({ apiKey });
         )}
         <Grid>
           {TRACKS.map((track, index) => {
+            // כשלא מחובר - הכל פתוח
+            if (!user) {
+              const isActive = activeTrack === track.id;
+              return (
+                <TrackCard 
+                  key={track.id} 
+                  $active={isActive}
+                  onClick={() => handleTrackChange(track.id)}
+                  style={{
+                    opacity: 1,
+                    cursor: 'pointer',
+                    position: 'relative'
+                  }}
+                >
+                  {track.icon}
+                  <span>{track.label}</span>
+                </TrackCard>
+              );
+            }
+            
+            // כשיש משתמש מחובר - בדוק הגבלות
             const maxTracks = planAccess?.maxTracks || 4;
-            // אם maxTracks = 1, רק התחום הראשון זמין (או התחום הנוכחי אם כבר נבחר)
             const isDisabled = !planAccess || 
               (maxTracks <= 1 && index > 0 && activeTrack !== track.id) || 
               (maxTracks > 1 && index >= maxTracks);
@@ -2546,9 +2565,14 @@ const ai = new GoogleGenAI({ apiKey });
         <ExpertControlBar>
            <ExpertControlText>
              הנבחרת שלך ב<strong>{TRACKS.find(t => t.id === activeTrack)?.label}</strong>: אלו המומחים ומה הם בודקים
-             {planAccess && (
+             {user && planAccess && (
                <span style={{ color: '#D4A043', marginRight: '10px' }}>
                  ({selectedExperts.length} / {planAccess.maxExperts} מומחים)
+               </span>
+             )}
+             {!user && (
+               <span style={{ color: '#D4A043', marginRight: '10px' }}>
+                 ({selectedExperts.length} / 8 מומחים)
                </span>
              )}
            </ExpertControlText>
@@ -2556,14 +2580,14 @@ const ai = new GoogleGenAI({ apiKey });
               <ExpertToggleButton 
                 $active={isTop3()} 
                 onClick={handleSetTop3}
-                disabled={!planAccess || (planAccess?.maxExperts || 0) <= 3}
+                disabled={user && (!planAccess || (planAccess?.maxExperts || 0) <= 3)}
               >
                 3 המובילים
               </ExpertToggleButton>
               <ExpertToggleButton 
                 $active={isAll()} 
                 onClick={handleSetAll}
-                disabled={!planAccess || (planAccess?.maxExperts || 0) <= 3}
+                disabled={user && (!planAccess || (planAccess?.maxExperts || 0) <= 3)}
               >
                 כל המומחים
               </ExpertToggleButton>
@@ -2573,8 +2597,28 @@ const ai = new GoogleGenAI({ apiKey });
         <Grid>
           {EXPERTS_BY_TRACK[activeTrack].map((expert, i) => {
             const isSelected = selectedExperts.includes(expert.title);
+            
+            // כשלא מחובר - הכל פתוח
+            if (!user) {
+              return (
+                <FeatureCard 
+                  key={i} 
+                  $selected={isSelected}
+                  onClick={() => toggleExpert(expert.title)}
+                  style={{
+                    opacity: 1,
+                    cursor: 'pointer',
+                    position: 'relative'
+                  }}
+                >
+                  <FeatureTitle $selected={isSelected}>{expert.title}</FeatureTitle>
+                  <FeatureDesc>{expert.desc}</FeatureDesc>
+                </FeatureCard>
+              );
+            }
+            
+            // כשיש משתמש מחובר - בדוק הגבלות
             const maxExperts = planAccess?.maxExperts || 8;
-            // בחבילת ניסיון: אם יש כבר 3 מומחים ולא נבחר, לא ניתן לבחור
             const canSelect = !isSelected && selectedExperts.length < maxExperts;
             const isDisabled = !planAccess || (!isSelected && !canSelect);
             
@@ -2636,7 +2680,7 @@ const ai = new GoogleGenAI({ apiKey });
                 {isImprovementMode ? 'העלה טייק משופר (ניסיון 2)' : `העלה סרטון ${TRACKS.find(t => t.id === activeTrack)?.label}`}
               </UploadTitle>
               <UploadSubtitle>
-                {planAccess 
+                {user && planAccess 
                   ? `עד ${planAccess.maxVideoMinutes} דקות או ${planAccess.maxVideoMB}MB`
                   : 'עד 5 דקות או 20MB'}
               </UploadSubtitle>

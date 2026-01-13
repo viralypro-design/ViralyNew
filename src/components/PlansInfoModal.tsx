@@ -16,6 +16,7 @@ const ModalOverlay = styled.div`
   z-index: 1000;
   padding: 10px;
   animation: fadeIn 0.3s ease-out;
+  cursor: pointer;
   
   @keyframes fadeIn {
     from { opacity: 0; }

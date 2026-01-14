@@ -1924,17 +1924,29 @@ const App = () => {
     
     // כשיש משתמש - בדוק אם יש הרשאה לבחור תחום
     if (!planAccess) {
-      alert('אין הרשאה. נא לבדוק את החבילה שלך.');
+      // אם אין planAccess, עדיין אפשר לבחור תחום (למקרה של משתמש חדש)
+      setActiveTrack(id as TrackId);
+      setResult(null);
+      setPreviousResult(null);
+      setIsImprovementMode(false);
+      if (['actors', 'musicians', 'creators', 'influencers'].includes(id)) {
+        setModalTab(id);
+      }
       return;
     }
     
-    // רק יוצרים באקסטרים יכול לשנות תחום (maxTracks > 1)
-    // ניסיון ויוצרים מוגבלים לתחום אחד בלבד
-    if (planAccess.maxTracks <= 1 && activeTrack !== id) {
-      alert(`החבילה שלך מוגבלת לתחום אחד בלבד. שדרג ל"יוצרים באקסטרים" כדי לגשת לכל התחומים.`);
-      return;
+    // בחבילת נסיון ויוצרים (maxTracks = 1) - אפשר לבחור תחום אחד
+    // אם כבר יש default_track, אפשר לשנות אותו רק אם זה התחום הנוכחי
+    if (planAccess.maxTracks <= 1) {
+      // אם יש default_track והמשתמש מנסה לשנות לתחום אחר - לא לאפשר
+      if (subscription?.default_track && subscription.default_track !== id) {
+        // המשתמש כבר בחר תחום - לא לאפשר שינוי
+        return;
+      }
+      // אם אין default_track או שהמשתמש בוחר את התחום שכבר נבחר - אפשר
     }
     
+    // בחבילת יוצרים באקסטרים (maxTracks > 1) - כל התחומים פתוחים
     setActiveTrack(id as TrackId);
     setResult(null);
     setPreviousResult(null);
@@ -2680,11 +2692,6 @@ const ai = new GoogleGenAI({ apiKey });
         )}
         
         <SectionLabel>בחר את מסלול הניתוח שלך:</SectionLabel>
-        {user && !planAccess && (
-          <ErrorMsg style={{ textAlign: 'center', marginBottom: '20px' }}>
-            אין הרשאה. נא לבדוק את החבילה שלך.
-          </ErrorMsg>
-        )}
         <Grid>
           {TRACKS.map((track, index) => {
             // כשלא מחובר - הכל פתוח
@@ -2709,9 +2716,28 @@ const ai = new GoogleGenAI({ apiKey });
             
             // כשיש משתמש מחובר - בדוק הגבלות
             const maxTracks = planAccess?.maxTracks || 4;
-            const isDisabled = !planAccess || 
-              (maxTracks <= 1 && index > 0 && activeTrack !== track.id) || 
-              (maxTracks > 1 && index >= maxTracks);
+            
+            // בחבילת נסיון ויוצרים (maxTracks = 1) - אפשר לבחור תחום אחד
+            // אם יש default_track, רק התחום הזה פתוח
+            let isDisabled = false;
+            if (planAccess) {
+              if (maxTracks <= 1) {
+                // אם יש default_track, רק התחום הזה פתוח
+                if (subscription?.default_track) {
+                  isDisabled = track.id !== subscription.default_track;
+                } else {
+                  // אם אין default_track, כל התחומים פתוחים לבחירה (אבל רק אחד)
+                  isDisabled = false;
+                }
+              } else {
+                // בחבילת יוצרים באקסטרים (maxTracks > 1) - כל התחומים פתוחים
+                isDisabled = false;
+              }
+            } else {
+              // אם אין planAccess, כל התחומים פתוחים (למקרה של משתמש חדש)
+              isDisabled = false;
+            }
+            
             const isActive = activeTrack === track.id;
             
             return (

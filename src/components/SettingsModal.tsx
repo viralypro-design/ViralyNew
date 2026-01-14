@@ -209,6 +209,8 @@ interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
   userEmail: string;
+  isAdmin?: boolean;
+  onOpenAdminPanel?: () => void;
 }
 
 interface UserUpdate {
@@ -219,7 +221,36 @@ interface UserUpdate {
   is_read: boolean;
 }
 
-export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, userEmail }) => {
+const AdminButton = styled.button`
+  width: 100%;
+  background: linear-gradient(135deg, #D4A043 0%, #e6be74 50%, #D4A043 100%);
+  color: #000;
+  border: none;
+  padding: 15px 20px;
+  border-radius: 10px;
+  font-size: 1.1rem;
+  font-weight: 700;
+  cursor: pointer;
+  margin-top: 20px;
+  transition: all 0.3s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  
+  &:hover {
+    transform: scale(1.05);
+    box-shadow: 0 0 20px rgba(212, 160, 67, 0.5);
+  }
+`;
+
+export const SettingsModal: React.FC<SettingsModalProps> = ({ 
+  isOpen, 
+  onClose, 
+  userEmail,
+  isAdmin = false,
+  onOpenAdminPanel
+}) => {
   const { subscription, loading } = useSubscription();
   const planAccess = usePlanAccess(subscription);
   const [updates, setUpdates] = useState<UserUpdate[]>([]);

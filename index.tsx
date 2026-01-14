@@ -1801,9 +1801,7 @@ const App = () => {
         const userRole = session.user.user_metadata?.role;
         const isAdminUser = userRole === 'admin';
         setIsAdmin(isAdminUser);
-        if (isAdminUser) {
-          setShowAdminPanel(true);
-        }
+        // Don't auto-open admin panel - user needs to click Settings button
       } else {
         setUser(null);
         setIsAdmin(false);
@@ -1819,9 +1817,7 @@ const App = () => {
         const userRole = session.user.user_metadata?.role;
         const isAdminUser = userRole === 'admin';
         setIsAdmin(isAdminUser);
-        if (isAdminUser) {
-          setShowAdminPanel(true);
-        }
+        // Don't auto-open admin panel - user needs to click Settings button
       }
       setCheckingAuth(false);
     });
@@ -2408,16 +2404,6 @@ const ai = new GoogleGenAI({ apiKey });
   const isAll = () => {
     return selectedExperts.length === currentExpertsList.length;
   };
-
-  // If admin panel is shown, render it instead
-  if (showAdminPanel) {
-    return (
-      <>
-        <GlobalStyle />
-        <AdminPanel onBack={() => setShowAdminPanel(false)} />
-      </>
-    );
-  }
 
   if (checkingAuth) {
     return (

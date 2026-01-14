@@ -2587,11 +2587,6 @@ const ai = new GoogleGenAI({ apiKey });
           />
         )}
         
-        {showAdminPanel && (
-          <AdminPanel onBack={() => setShowAdminPanel(false)} />
-        )}
-
-
         <SectionLabel>בחר את מסלול הניתוח שלך:</SectionLabel>
         {user && !planAccess && (
           <ErrorMsg style={{ textAlign: 'center', marginBottom: '20px' }}>
@@ -2941,6 +2936,13 @@ const ai = new GoogleGenAI({ apiKey });
           </ResponseArea>
         )}
       </AppContainer>
+      
+      {showAdminPanel && (
+        <AdminPanel onBack={() => {
+          console.log('Closing admin panel...');
+          setShowAdminPanel(false);
+        }} />
+      )}
     </>
   );
 };

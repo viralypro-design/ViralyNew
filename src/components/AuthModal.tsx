@@ -458,6 +458,29 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       }
 
       if (signUpData?.user) {
+        // בדוק אם המשתמש צריך לאמת את האימייל
+        const needsEmailConfirmation = signUpData.user.email_confirmed_at === null || 
+                                       signUpData.user.email_confirmed_at === undefined;
+        
+        if (needsEmailConfirmation) {
+          // המשתמש צריך לאמת את האימייל
+          setSuccess('המשתמש נוצר בהצלחה! אנא אמת את האימייל שלך לפני התחברות.');
+          setError(null);
+          setLoading(false);
+          
+          console.log('[AuthModal] User created but needs email confirmation:', {
+            user_id: signUpData.user.id,
+            email: signUpData.user.email,
+            plan_type: selectedPlan,
+            default_track: selectedTrack
+          });
+          
+          // לא ננסה להתחבר - המשתמש צריך לאמת את האימייל קודם
+          // הטריגר ייצור subscription אחרי שהמשתמש יאמת את האימייל ויתחבר
+          return;
+        }
+        
+        // אם האימייל כבר מאומת (לא אמור לקרות בדרך כלל), המשך עם התחברות
         setSuccess('המשתמש נוצר בהצלחה! מתחבר...');
         
         console.log('[AuthModal] User created, waiting for trigger to create subscription...', {
@@ -610,6 +633,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           track_match: !selectedTrack || finalSubscriptionCheck?.default_track === selectedTrack
         });
         
+        // אם האימייל לא מאומת, לא ננסה להתחבר
+        if (signUpData.user.email_confirmed_at === null || signUpData.user.email_confirmed_at === undefined) {
+          setSuccess('המשתמש נוצר בהצלחה! אנא אמת את האימייל שלך ונסה להתחבר שוב.');
+          setLoading(false);
+          return;
+        }
+        
         const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
           email: email.trim().toLowerCase(),
           password,
@@ -617,11 +647,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
         if (signInError) {
           // אם יש שגיאה אבל המשתמש נוצר, יכול להיות שצריך אימות אימייל
-          if (signInError.message.includes('email') || signInError.message.includes('confirm')) {
+          if (signInError.message.includes('email') || signInError.message.includes('confirm') || 
+              signInError.message.includes('Email not confirmed') || 
+              signInError.message.includes('email_not_confirmed')) {
             setSuccess('המשתמש נוצר בהצלחה! אנא אמת את האימייל שלך ונסה להתחבר שוב.');
+            setError(null);
           } else {
             setError(`המשתמש נוצר אבל לא ניתן להתחבר: ${signInError.message}`);
           }
+          setLoading(false);
+          return;
         } else if (signInData?.session) {
           // המתן שהטריגר/עדכונים יושלמו לפני סגירה
           // SubscriptionProvider יטען את הנתונים אחרי SIGNED_IN event

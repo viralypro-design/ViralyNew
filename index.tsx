@@ -1866,12 +1866,26 @@ const App = () => {
       if (event === 'SIGNED_IN' && session) {
         const urlParams = new URLSearchParams(window.location.search);
         const hashParams = new URLSearchParams(window.location.hash.substring(1));
-        if (urlParams.get('type') === 'email' || hashParams.get('type') === 'email') {
-          console.log('[App] Email verification detected, reloading page...');
-          // המשתמש אימת את האימייל - רענן את הדף כדי לטעון את ה-subscription
-          setTimeout(() => {
-            window.location.href = window.location.origin + window.location.pathname;
-          }, 1500);
+        const isEmailVerification = urlParams.get('type') === 'email' || 
+                                   hashParams.get('type') === 'email' ||
+                                   window.location.hash.includes('type=email');
+        
+        if (isEmailVerification) {
+          console.log('[App] Email verification detected, user signed in after email confirmation');
+          console.log('[App] User:', {
+            id: session.user.id,
+            email: session.user.email,
+            email_confirmed: session.user.email_confirmed_at
+          });
+          
+          // המשתמש אימת את האימייל והתחבר - נקה את ה-URL ונחכה שהטריגר/SubscriptionProvider יטען את ה-subscription
+          // נקה את ה-hash/query params
+          if (window.location.hash.includes('type=email') || window.location.search.includes('type=email')) {
+            window.history.replaceState({}, document.title, window.location.pathname);
+          }
+          
+          // SubscriptionProvider יטען את ה-subscription אוטומטית אחרי SIGNED_IN
+          // אם אין subscription, הוא ינסה ליצור אותו אוטומטית אם יש plan_type ב-metadata
         }
       }
       

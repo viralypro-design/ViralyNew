@@ -5,8 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "start": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:signup": "node --loader ts-node/esm tests/test-signup-flow.ts",
+    "test:signup:tsx": "npx tsx tests/test-signup-flow.ts"
   },
   "dependencies": {
     "react": "18.2.0",

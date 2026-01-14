@@ -517,10 +517,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         }
       }}>
         <ModalContent onClick={e => e.stopPropagation()}>
-          <CloseButton onClick={(e) => {
-            e.stopPropagation();
-            onClose();
-          }}>✕</CloseButton>
+          <CloseButton 
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onClose();
+            }}
+          >✕</CloseButton>
           <ModalHeader>
             <h2>{mode === 'login' ? 'התחברות' : 'הרשמה'}</h2>
             <p>{mode === 'login' ? 'התחבר לחשבון שלך' : 'צור חשבון חדש והתחל להשתמש'}</p>

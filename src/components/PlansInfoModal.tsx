@@ -245,10 +245,14 @@ export const PlansInfoModal: React.FC<PlansInfoModalProps> = ({
       }
     }}>
       <ModalContent onClick={e => e.stopPropagation()}>
-        <ModalCloseBtn onClick={(e) => {
-          e.stopPropagation();
-          onClose();
-        }}>✕</ModalCloseBtn>
+        <ModalCloseBtn 
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onClose();
+          }}
+        >✕</ModalCloseBtn>
         <ModalHeader>
           <h2>📦 חבילות והצעות</h2>
           <p>בחר את החבילה המתאימה לך ביותר</p>

@@ -32,5 +32,6 @@ export interface SubscriptionRow {
   status: 'active' | 'inactive';
   minutes_used_monthly: number;
   analyses_used_monthly: number;
+  default_track?: string; // תחום ברירת מחדל: 'actors', 'musicians', 'creators', 'influencers'
 }
 

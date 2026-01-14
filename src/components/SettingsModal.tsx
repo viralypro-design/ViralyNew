@@ -276,6 +276,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }}>
       <ModalContent onClick={e => e.stopPropagation()}>
         <CloseButton 
+          type="button"
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();

@@ -1337,11 +1337,14 @@ const CapabilitiesModal = ({ isOpen, onClose, activeTab, setActiveTab }: { isOpe
       }
     }}>
       <ModalContent onClick={e => e.stopPropagation()}>
-        <ModalCloseBtn onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          onClose();
-        }}>✕</ModalCloseBtn>
+        <ModalCloseBtn 
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onClose();
+          }}
+        >✕</ModalCloseBtn>
         <ModalHeader>
           <ModalTitle>יכולות האפליקציה של סוכן העל</ModalTitle>
           <ModalSubtitle>
@@ -1860,13 +1863,38 @@ const App = () => {
     setSelectedExperts(defaults);
   }, [activeTrack]);
 
-  // הגדר תחום ראשוני לפי החבילה
+  // הגדר תחום ראשוני לפי החבילה או default_track של המשתמש
   useEffect(() => {
+    if (!user || !subscription) return;
+    
+    // אם יש default_track ב-subscription, השתמש בו
+    if (subscription.default_track && ['actors', 'musicians', 'creators', 'influencers'].includes(subscription.default_track)) {
+      setActiveTrack(subscription.default_track as TrackId);
+      return;
+    }
+    
+    // אם החבילה מוגבלת לתחום אחד, ודא שאנחנו בתחום הראשון
     if (planAccess && planAccess.maxTracks === 1 && activeTrack !== 'actors') {
-      // אם החבילה מוגבלת לתחום אחד, ודא שאנחנו בתחום הראשון
       setActiveTrack('actors');
     }
-  }, [planAccess]);
+  }, [planAccess, subscription, user]);
+  
+  // בדיקה אם משתמש חדש צריך לבחור תחום
+  const [showTrackSelectionModal, setShowTrackSelectionModal] = useState(false);
+  
+  useEffect(() => {
+    if (!user || !subscription || !planAccess) return;
+    
+    // בדוק אם זה משתמש חדש (נוצר היום) ואין לו default_track
+    const userCreatedToday = new Date(user.created_at);
+    const today = new Date();
+    const isNewUser = userCreatedToday.toDateString() === today.toDateString();
+    
+    // אם החבילה מאפשרת יותר מתחום אחד, והמשתמש חדש, ואין לו default_track
+    if (isNewUser && !subscription.default_track && planAccess.maxTracks > 1) {
+      setShowTrackSelectionModal(true);
+    }
+  }, [user, subscription, planAccess]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -1881,7 +1909,7 @@ const App = () => {
     setIsImprovementMode(false);
   };
 
-  const handleTrackChange = (id: string) => {
+  const handleTrackChange = async (id: string) => {
     // כשלא מחובר - אפשר לעבור בין כל התחומים
     if (!user) {
       setActiveTrack(id as TrackId);
@@ -1911,6 +1939,22 @@ const App = () => {
     setResult(null);
     setPreviousResult(null);
     setIsImprovementMode(false);
+    
+    // שמור את התחום הנבחר כברירת מחדל
+    if (subscription && ['actors', 'musicians', 'creators', 'influencers'].includes(id)) {
+      try {
+        const { error } = await supabase.rpc('update_user_default_track', {
+          p_user_id: user.id,
+          p_default_track: id
+        });
+        if (error) {
+          console.error('Error saving default track:', error);
+        }
+      } catch (err) {
+        console.error('Error saving default track:', err);
+      }
+    }
+    
     // Sync modal tab with active track if possible
     if (['actors', 'musicians', 'creators', 'influencers'].includes(id)) {
         setModalTab(id);
@@ -2585,6 +2629,54 @@ const ai = new GoogleGenAI({ apiKey });
             onClose={() => setIsSettingsModalOpen(false)}
             userEmail={user.email}
           />
+        )}
+        
+        {/* חלון בחירת תחום למשתמש חדש */}
+        {showTrackSelectionModal && user && planAccess && planAccess.maxTracks > 1 && (
+          <ModalOverlay onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowTrackSelectionModal(false);
+            }
+          }}>
+            <ModalContent onClick={e => e.stopPropagation()}>
+              <ModalCloseBtn 
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setShowTrackSelectionModal(false);
+                }}
+              >✕</ModalCloseBtn>
+              <ModalHeader>
+                <ModalTitle>🎯 בחר תחום ניתוח</ModalTitle>
+                <ModalSubtitle>
+                  זה הכניסה הראשונה שלך! בחר את התחום שבו תרצה להתמחות.
+                  <br/>
+                  הבחירה תישמר כברירת מחדל לכל כניסה עתידית.
+                </ModalSubtitle>
+              </ModalHeader>
+              <div style={{ padding: '30px', display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px' }}>
+                {TRACKS.map((track) => (
+                  <TrackCard
+                    key={track.id}
+                    $active={activeTrack === track.id}
+                    onClick={async () => {
+                      await handleTrackChange(track.id);
+                      setShowTrackSelectionModal(false);
+                    }}
+                    style={{
+                      cursor: 'pointer',
+                      padding: '20px',
+                      textAlign: 'center'
+                    }}
+                  >
+                    {track.icon}
+                    <span style={{ display: 'block', marginTop: '10px' }}>{track.label}</span>
+                  </TrackCard>
+                ))}
+              </div>
+            </ModalContent>
+          </ModalOverlay>
         )}
         
         <SectionLabel>בחר את מסלול הניתוח שלך:</SectionLabel>

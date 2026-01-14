@@ -2735,6 +2735,8 @@ const ai = new GoogleGenAI({ apiKey });
             setAuthModalInitialMode('signup');
             setIsAuthModalOpen(true);
           }}
+          isUserLoggedIn={!!user}
+          hasPaymentSystem={false} // בשלב זה אין מערכת תשלומים
         />
         
         <AuthModal

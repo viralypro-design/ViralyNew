@@ -204,6 +204,8 @@ interface PlansInfoModalProps {
   currentPlan?: PlanType;
   onUpgrade?: (planType: PlanType) => void;
   onSignUpWithPlan?: (planType: PlanType) => void;
+  isUserLoggedIn?: boolean; // האם המשתמש מחובר
+  hasPaymentSystem?: boolean; // האם יש מערכת תשלומים (לעתיד)
 }
 
 export const PlansInfoModal: React.FC<PlansInfoModalProps> = ({ 
@@ -211,7 +213,9 @@ export const PlansInfoModal: React.FC<PlansInfoModalProps> = ({
   onClose, 
   currentPlan,
   onUpgrade,
-  onSignUpWithPlan
+  onSignUpWithPlan,
+  isUserLoggedIn = false,
+  hasPaymentSystem = false // בשלב זה אין מערכת תשלומים
 }) => {
   if (!isOpen) return null;
 
@@ -306,11 +310,19 @@ export const PlansInfoModal: React.FC<PlansInfoModalProps> = ({
                   {!isCurrent && (
                     <button
                       onClick={() => {
-                        if (onSignUpWithPlan) {
-                          // אם יש משתמש - שדרג, אם לא - הרשמה
+                        // אם המשתמש מחובר - שדרג ישירות (או פתח תשלום אם יש מערכת תשלומים)
+                        if (isUserLoggedIn) {
+                          if (hasPaymentSystem) {
+                            // בעתיד: פתח חלון תשלום
+                            // TODO: Implement payment flow
+                            alert('מערכת תשלומים תפתח כאן בעתיד');
+                          } else if (onUpgrade) {
+                            // בשלב זה, בלי תשלומים - עדכן ישירות
+                            onUpgrade(planType);
+                          }
+                        } else if (onSignUpWithPlan) {
+                          // אם המשתמש לא מחובר - פתח טופס הרשמה
                           onSignUpWithPlan(planType);
-                        } else if (onUpgrade) {
-                          onUpgrade(planType);
                         }
                       }}
                       style={{
@@ -332,7 +344,10 @@ export const PlansInfoModal: React.FC<PlansInfoModalProps> = ({
                         e.currentTarget.style.transform = 'scale(1)';
                       }}
                     >
-                      {onSignUpWithPlan ? '📝 הרשמה לחבילה זו' : '🔄 שדרג לחבילה זו'}
+                      {isUserLoggedIn 
+                        ? (hasPaymentSystem ? '💳 שדרג עם תשלום' : '🔄 שדרג לחבילה זו')
+                        : '📝 הרשמה לחבילה זו'
+                      }
                     </button>
                   )}
                 </PlanCard>

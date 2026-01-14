@@ -494,35 +494,54 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           console.log('  3. Trigger failed silently');
           console.log('[AuthModal] Attempting to create subscription manually via RPC...');
           
-          // ננסה ליצור subscription ידנית דרך RPC
+          // ננסה ליצור subscription ידנית דרך RPC function חדש
           try {
-            const { data: rpcData, error: rpcError } = await supabase.rpc('update_user_plan_type', {
-              new_plan_type: selectedPlan
+            console.log('[AuthModal] Calling create_user_subscription RPC...', {
+              user_id: signUpData.user.id,
+              plan_type: selectedPlan,
+              default_track: selectedTrack
+            });
+            
+            const { data: rpcData, error: rpcError } = await supabase.rpc('create_user_subscription', {
+              p_user_id: signUpData.user.id,
+              p_plan_type: selectedPlan,
+              p_default_track: selectedTrack || null
             });
             
             if (rpcError) {
               console.error('[AuthModal] Failed to create subscription via RPC:', rpcError);
+              console.log('[AuthModal] Error details:', {
+                code: rpcError.code,
+                message: rpcError.message,
+                details: rpcError.details,
+                hint: rpcError.hint
+              });
               console.log('[AuthModal] Continuing with sign-in - subscription will be checked after login.');
             } else if (rpcData?.success) {
-              console.log('[AuthModal] Subscription created successfully via RPC');
+              console.log('[AuthModal] Subscription created successfully via RPC:', rpcData);
               // המתן שהעדכון יסתיים
-              await new Promise(resolve => setTimeout(resolve, 500));
+              await new Promise(resolve => setTimeout(resolve, 800));
               
               // בדוק שוב
-              const { data: subCheck } = await supabase
+              const { data: subCheck, error: subCheckError } = await supabase
                 .from('user_subscriptions')
                 .select('*')
                 .eq('user_id', signUpData.user.id)
                 .maybeSingle();
               
-              if (subCheck) {
+              if (subCheck && !subCheckError) {
                 subscriptionCreated = true;
                 subscriptionCheck = subCheck;
                 console.log('[AuthModal] Subscription verified after RPC creation:', subCheck);
+              } else {
+                console.warn('[AuthModal] Subscription created but not found in verification:', subCheckError);
               }
+            } else {
+              console.error('[AuthModal] RPC returned error:', rpcData);
             }
-          } catch (err) {
+          } catch (err: any) {
             console.error('[AuthModal] Error creating subscription via RPC:', err);
+            console.error('[AuthModal] Error stack:', err.stack);
           }
           
           if (!subscriptionCreated) {

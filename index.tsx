@@ -8,6 +8,7 @@ import { SignUpComponent } from '@/components/SignUpComponent';
 import { PlansInfoModal } from '@/components/PlansInfoModal';
 import { AuthModal } from '@/components/AuthModal';
 import { SettingsModal } from '@/components/SettingsModal';
+import { AdminPanel } from '@/components/AdminPanel';
 import { usePlanAccess } from '@/hooks/usePlanAccess';
 import { PLAN_CONFIG } from '@/config/planConfig';
 import { PlanType } from '@/types/subscription';
@@ -1753,6 +1754,8 @@ const App = () => {
   const [modalTab, setModalTab] = useState('actors');
   const [user, setUser] = useState<any>(null);
   const [checkingAuth, setCheckingAuth] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [showAdminPanel, setShowAdminPanel] = useState(false);
   
   // Subscription and plan access
   const { subscription, loading: subscriptionLoading } = useSubscription();
@@ -1791,17 +1794,37 @@ const App = () => {
 
   // Listen to auth changes (but don't auto-check on mount)
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session?.user) {
         setUser(session.user);
+        // Check if user is admin
+        const userRole = session.user.user_metadata?.role;
+        const isAdminUser = userRole === 'admin';
+        setIsAdmin(isAdminUser);
+        if (isAdminUser) {
+          setShowAdminPanel(true);
+        }
       } else {
         setUser(null);
+        setIsAdmin(false);
+        setShowAdminPanel(false);
       }
       setCheckingAuth(false);
     });
 
-    // Set initial state - no auto-check
-    setCheckingAuth(false);
+    // Check initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        setUser(session.user);
+        const userRole = session.user.user_metadata?.role;
+        const isAdminUser = userRole === 'admin';
+        setIsAdmin(isAdminUser);
+        if (isAdminUser) {
+          setShowAdminPanel(true);
+        }
+      }
+      setCheckingAuth(false);
+    });
 
     return () => {
       subscription.unsubscribe();
@@ -2385,6 +2408,16 @@ const ai = new GoogleGenAI({ apiKey });
   const isAll = () => {
     return selectedExperts.length === currentExpertsList.length;
   };
+
+  // If admin panel is shown, render it instead
+  if (showAdminPanel) {
+    return (
+      <>
+        <GlobalStyle />
+        <AdminPanel onBack={() => setShowAdminPanel(false)} />
+      </>
+    );
+  }
 
   if (checkingAuth) {
     return (

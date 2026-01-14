@@ -45,11 +45,12 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    // Try to get subscription - if admin, might not have one, that's OK
     const { data, error } = await supabase
       .from('user_subscriptions')
       .select('*')
       .eq('user_id', session.user.id)
-      .single();
+      .maybeSingle(); // Use maybeSingle instead of single to avoid error if no row
 
     if (error) {
       if (error.code === 'PGRST116') {

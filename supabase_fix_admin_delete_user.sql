@@ -14,26 +14,39 @@ CREATE OR REPLACE FUNCTION public.delete_admin_user(p_user_id uuid)
 RETURNS boolean
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public, auth
+SET search_path = public, auth, pg_catalog
 AS $$
+DECLARE
+  v_deleted boolean := false;
 BEGIN
   -- בדיקה אם המשתמש הוא אדמין
   IF NOT public.is_admin() THEN
     RAISE EXCEPTION 'Access denied. Admin role required.';
   END IF;
 
-  -- מחיקת הנתונים הקשורים למשתמש
-  DELETE FROM public.user_subscriptions WHERE user_id = p_user_id;
+  -- בדיקה שהמשתמש קיים
+  IF NOT EXISTS (SELECT 1 FROM auth.users WHERE id = p_user_id) THEN
+    RAISE EXCEPTION 'User not found';
+  END IF;
+
+  -- מחיקת הנתונים הקשורים למשתמש (לפני מחיקת המשתמש עצמו)
+  DELETE FROM public.user_benefits WHERE user_id = p_user_id;
+  DELETE FROM public.user_updates WHERE user_id = p_user_id;
   DELETE FROM public.analyses WHERE user_id = p_user_id;
   DELETE FROM public.videos WHERE user_id = p_user_id;
-  DELETE FROM public.user_updates WHERE user_id = p_user_id;
-  DELETE FROM public.user_benefits WHERE user_id = p_user_id;
+  DELETE FROM public.user_subscriptions WHERE user_id = p_user_id;
   
   -- מחיקת המשתמש עצמו מ-auth.users
+  -- הערה: בגלל RLS, צריך להשתמש ב-SECURITY DEFINER עם search_path נכון
   DELETE FROM auth.users WHERE id = p_user_id;
   
+  -- בדיקה שהמשתמש נמחק
+  IF NOT EXISTS (SELECT 1 FROM auth.users WHERE id = p_user_id) THEN
+    v_deleted := true;
+  END IF;
+  
   -- החזרת true כדי לציין שהפעולה בוצעה
-  RETURN true;
+  RETURN v_deleted;
 END;
 $$;
 

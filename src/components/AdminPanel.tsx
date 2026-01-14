@@ -575,46 +575,87 @@ export const AdminPanel: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   };
 
   const handleDeleteUser = async (userId: string) => {
-    if (!confirm('האם אתה בטוח שברצונך למחוק משתמש זה?')) return;
+    if (!confirm('האם אתה בטוח שברצונך למחוק משתמש זה? פעולה זו לא ניתנת לביטול!')) return;
     
+    setLoading(true);
     try {
-      const { error } = await supabase.rpc('delete_admin_user', { p_user_id: userId });
-      if (error) throw error;
-      await loadUsers();
-      alert('משתמש נמחק בהצלחה');
+      const { data, error } = await supabase.rpc('delete_admin_user', { p_user_id: userId });
+      
+      if (error) {
+        console.error('RPC Error:', error);
+        throw error;
+      }
+      
+      // בדיקה שהמשתמש נמחק (הפונקציה מחזירה jsonb)
+      if (data && typeof data === 'object') {
+        if (data.success === true && data.deleted === true) {
+          await loadUsers();
+          alert('משתמש נמחק בהצלחה');
+        } else {
+          throw new Error(data.message || 'המשתמש לא נמחק. בדוק את ההרשאות.');
+        }
+      } else if (data === true) {
+        // תמיכה בגרסה הישנה של הפונקציה
+        await loadUsers();
+        alert('משתמש נמחק בהצלחה');
+      } else {
+        throw new Error('המשתמש לא נמחק. בדוק את ההרשאות.');
+      }
     } catch (error: any) {
       console.error('Error deleting user:', error);
-      alert(`שגיאה במחיקת משתמש: ${error.message || 'Unknown error'}`);
+      alert(`שגיאה במחיקת משתמש: ${error.message || 'Unknown error'}\n\nאם הבעיה נמשכת, נסה למחוק את המשתמש ידנית דרך Supabase Dashboard.`);
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleUpdateUserPlan = async (userId: string, planType: PlanType) => {
+    setLoading(true);
     try {
-      const { error } = await supabase.rpc('update_user_plan_admin', {
+      const { data, error } = await supabase.rpc('update_user_plan_admin', {
         p_user_id: userId,
         p_plan_type: planType
       });
+      
       if (error) throw error;
+      
+      // בדיקה שהעדכון הצליח
+      if (data && typeof data === 'object' && data.success === false) {
+        throw new Error(data.message || 'עדכון החבילה נכשל');
+      }
+      
       await loadUsers();
       alert('חבילת המשתמש עודכנה בהצלחה');
     } catch (error: any) {
       console.error('Error updating user plan:', error);
       alert(`שגיאה בעדכון חבילת המשתמש: ${error.message || 'Unknown error'}`);
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleUpdateUserRole = async (userId: string, role: 'user' | 'admin') => {
+    setLoading(true);
     try {
-      const { error } = await supabase.rpc('update_user_role', {
+      const { data, error } = await supabase.rpc('update_user_role', {
         p_user_id: userId,
         p_role: role
       });
+      
       if (error) throw error;
+      
+      // בדיקה שהעדכון הצליח
+      if (data && typeof data === 'object' && data.success === false) {
+        throw new Error(data.message || 'עדכון התפקיד נכשל');
+      }
+      
       await loadUsers();
       alert('תפקיד המשתמש עודכן בהצלחה');
     } catch (error: any) {
       console.error('Error updating user role:', error);
       alert(`שגיאה בעדכון תפקיד המשתמש: ${error.message || 'Unknown error'}`);
+    } finally {
+      setLoading(false);
     }
   };
 

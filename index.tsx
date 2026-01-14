@@ -9,6 +9,8 @@ import { PlansInfoModal } from '@/components/PlansInfoModal';
 import { AuthModal } from '@/components/AuthModal';
 import { SettingsModal } from '@/components/SettingsModal';
 import { AdminPanel } from '@/components/AdminPanel';
+import { SimplePlanManager } from '@/components/SimplePlanManager';
+import { PlanTester } from '@/components/PlanTester';
 import { usePlanAccess } from '@/hooks/usePlanAccess';
 import { PLAN_CONFIG } from '@/config/planConfig';
 import { PlanType } from '@/types/subscription';
@@ -1767,6 +1769,8 @@ const App = () => {
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [showAdminPanel, setShowAdminPanel] = useState(false);
+  const [isTestUser, setIsTestUser] = useState(false);
+  const [showTestInterface, setShowTestInterface] = useState(false);
   
   // Subscription and plan access
   const { subscription, loading: subscriptionLoading } = useSubscription();
@@ -1846,16 +1850,25 @@ const App = () => {
         const userRole = session.user.user_metadata?.role;
         const isAdminUser = userRole === 'admin';
         setIsAdmin(isAdminUser);
+        
+        // Check if user is test user
+        const testUserEmail = 'viralytest@test.com';
+        const isTestUserEmail = session.user.email?.toLowerCase() === testUserEmail.toLowerCase();
+        setIsTestUser(isTestUserEmail);
+        
         console.log('[App] User logged in:', {
           id: session.user.id,
           email: session.user.email,
-          isAdmin: isAdminUser
+          isAdmin: isAdminUser,
+          isTestUser: isTestUserEmail
         });
         // Don't auto-open admin panel - user needs to click Settings button
       } else {
         setUser(null);
         setIsAdmin(false);
+        setIsTestUser(false);
         setShowAdminPanel(false);
+        setShowTestInterface(false);
         console.log('[App] User logged out');
       }
       setCheckingAuth(false);
@@ -1868,6 +1881,12 @@ const App = () => {
         const userRole = session.user.user_metadata?.role;
         const isAdminUser = userRole === 'admin';
         setIsAdmin(isAdminUser);
+        
+        // Check if user is test user
+        const testUserEmail = 'viralytest@test.com';
+        const isTestUserEmail = session.user.email?.toLowerCase() === testUserEmail.toLowerCase();
+        setIsTestUser(isTestUserEmail);
+        
         // Don't auto-open admin panel - user needs to click Settings button
       }
       setCheckingAuth(false);
@@ -2608,10 +2627,12 @@ const ai = new GoogleGenAI({ apiKey });
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    console.log('Settings button clicked, isAdmin:', isAdmin);
+                    console.log('Settings button clicked, isAdmin:', isAdmin, 'isTestUser:', isTestUser);
                     if (isAdmin) {
                       console.log('Opening admin panel...');
                       setShowAdminPanel(true);
+                    } else if (isTestUser) {
+                      setShowTestInterface(true);
                     } else {
                       setIsSettingsModalOpen(true);
                     }
@@ -2621,7 +2642,7 @@ const ai = new GoogleGenAI({ apiKey });
                     fontSize: '0.85rem'
                   }}
                 >
-                  ⚙️ {isAdmin ? 'פאנל ניהול' : 'הגדרות'}
+                  ⚙️ {isAdmin ? 'פאנל ניהול' : isTestUser ? '🧪 ממשק בדיקות' : 'הגדרות'}
                 </LogoutButton>
               </div>
             </div>
@@ -3165,6 +3186,65 @@ const ai = new GoogleGenAI({ apiKey });
           console.log('Closing admin panel...');
           setShowAdminPanel(false);
         }} />
+      )}
+      
+      {/* ממשק בדיקות למשתמש viralytest@test.com */}
+      {showTestInterface && isTestUser && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.95)',
+          zIndex: 3000,
+          overflowY: 'auto',
+          padding: '20px'
+        }}>
+          <div style={{
+            maxWidth: '1200px',
+            margin: '0 auto',
+            position: 'relative'
+          }}>
+            <button
+              onClick={() => setShowTestInterface(false)}
+              style={{
+                position: 'fixed',
+                top: '20px',
+                right: '20px',
+                background: 'rgba(212, 160, 67, 0.2)',
+                border: '2px solid #D4A043',
+                color: '#D4A043',
+                borderRadius: '50%',
+                width: '50px',
+                height: '50px',
+                fontSize: '24px',
+                cursor: 'pointer',
+                zIndex: 3001,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontWeight: 'bold'
+              }}
+            >
+              ✕
+            </button>
+            
+            <div style={{ marginBottom: '30px' }}>
+              <h1 style={{ color: '#D4A043', textAlign: 'center', marginBottom: '10px' }}>
+                🧪 ממשק בדיקות - viralytest@test.com
+              </h1>
+              <p style={{ color: '#888', textAlign: 'center' }}>
+                ממשק בדיקות מלא: מעבר בין חבילות, בחירת תחומים, בחירת מומחים ועוד
+              </p>
+            </div>
+            
+            <SimplePlanManager />
+            <div style={{ marginTop: '30px' }}>
+              <PlanTester />
+            </div>
+          </div>
+        </div>
       )}
     </>
   );

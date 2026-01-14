@@ -492,10 +492,43 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           console.log('  1. User already existed (trigger only runs on new INSERT)');
           console.log('  2. Trigger is not installed');
           console.log('  3. Trigger failed silently');
-          console.log('[AuthModal] Continuing with sign-in - subscription will be checked after login.');
+          console.log('[AuthModal] Attempting to create subscription manually via RPC...');
           
-          // נמשיך עם התחברות - ה-SubscriptionProvider ינסה לטעון את ה-subscription
-          // אם אין subscription, המשתמש יראה הודעה מתאימה
+          // ננסה ליצור subscription ידנית דרך RPC
+          try {
+            const { data: rpcData, error: rpcError } = await supabase.rpc('update_user_plan_type', {
+              new_plan_type: selectedPlan
+            });
+            
+            if (rpcError) {
+              console.error('[AuthModal] Failed to create subscription via RPC:', rpcError);
+              console.log('[AuthModal] Continuing with sign-in - subscription will be checked after login.');
+            } else if (rpcData?.success) {
+              console.log('[AuthModal] Subscription created successfully via RPC');
+              // המתן שהעדכון יסתיים
+              await new Promise(resolve => setTimeout(resolve, 500));
+              
+              // בדוק שוב
+              const { data: subCheck } = await supabase
+                .from('user_subscriptions')
+                .select('*')
+                .eq('user_id', signUpData.user.id)
+                .maybeSingle();
+              
+              if (subCheck) {
+                subscriptionCreated = true;
+                subscriptionCheck = subCheck;
+                console.log('[AuthModal] Subscription verified after RPC creation:', subCheck);
+              }
+            }
+          } catch (err) {
+            console.error('[AuthModal] Error creating subscription via RPC:', err);
+          }
+          
+          if (!subscriptionCreated) {
+            console.log('[AuthModal] Continuing with sign-in - subscription will be checked after login.');
+            console.log('[AuthModal] User may need to refresh the page or contact support.');
+          }
         }
         
         // עדכן את default_track דרך RPC (אם נדרש) - רק אם יש subscription

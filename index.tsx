@@ -2482,8 +2482,12 @@ const ai = new GoogleGenAI({ apiKey });
                   🚪 התנתק
                 </LogoutButton>
                 <LogoutButton 
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.log('Settings button clicked, isAdmin:', isAdmin);
                     if (isAdmin) {
+                      console.log('Opening admin panel...');
                       setShowAdminPanel(true);
                     } else {
                       setIsSettingsModalOpen(true);

@@ -65,11 +65,18 @@ interface AdminStats {
 // ============================================================================
 
 const AdminContainer = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   min-height: 100vh;
   background: #0a0a0a;
   color: #fff;
   padding: 20px;
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  z-index: 10000;
+  overflow-y: auto;
 `;
 
 const Header = styled.div`

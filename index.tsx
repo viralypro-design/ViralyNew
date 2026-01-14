@@ -1331,9 +1331,17 @@ const CapabilitiesModal = ({ isOpen, onClose, activeTab, setActiveTab }: { isOpe
   ];
 
   return (
-    <ModalOverlay onClick={onClose}>
+    <ModalOverlay onClick={(e) => {
+      if (e.target === e.currentTarget) {
+        onClose();
+      }
+    }}>
       <ModalContent onClick={e => e.stopPropagation()}>
-        <ModalCloseBtn onClick={onClose}>✕</ModalCloseBtn>
+        <ModalCloseBtn onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onClose();
+        }}>✕</ModalCloseBtn>
         <ModalHeader>
           <ModalTitle>יכולות האפליקציה של סוכן העל</ModalTitle>
           <ModalSubtitle>

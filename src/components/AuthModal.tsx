@@ -438,13 +438,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
 
     try {
+      // קבל את ה-URL הנוכחי ל-redirect אחרי אימות
+      const redirectUrl = `${window.location.origin}${window.location.pathname}`;
+      
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email: email.trim().toLowerCase(),
         password,
         options: {
           data: {
             plan_type: selectedPlan,
-          }
+          },
+          emailRedirectTo: redirectUrl
         }
       });
 
@@ -527,16 +531,27 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           }
         }
         
+        // רענן את ה-subscription לפני התחברות
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
         const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
           email: email.trim().toLowerCase(),
           password,
         });
 
         if (signInError) {
-          setError(`המשתמש נוצר אבל לא ניתן להתחבר: ${signInError.message}`);
+          // אם יש שגיאה אבל המשתמש נוצר, יכול להיות שצריך אימות אימייל
+          if (signInError.message.includes('email') || signInError.message.includes('confirm')) {
+            setSuccess('המשתמש נוצר בהצלחה! אנא אמת את האימייל שלך ונסה להתחבר שוב.');
+          } else {
+            setError(`המשתמש נוצר אבל לא ניתן להתחבר: ${signInError.message}`);
+          }
         } else if (signInData?.session) {
           setSuccess('נרשמת והתחברת בהצלחה!');
-          setTimeout(() => {
+          // רענן את ה-subscription
+          setTimeout(async () => {
+            // רענן את ה-subscription דרך context
+            await new Promise(resolve => setTimeout(resolve, 500));
             onSuccess();
             onClose();
           }, 500);

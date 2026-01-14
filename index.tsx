@@ -1824,7 +1824,18 @@ const App = () => {
 
   // Listen to auth changes (but don't auto-check on mount)
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      // טיפול באימות אימייל
+      if (event === 'SIGNED_IN' && session) {
+        const urlParams = new URLSearchParams(window.location.search);
+        const hashParams = new URLSearchParams(window.location.hash.substring(1));
+        if (urlParams.get('type') === 'email' || hashParams.get('type') === 'email') {
+          // המשתמש אימת את האימייל - רענן את הדף כדי לטעון את ה-subscription
+          setTimeout(() => {
+            window.location.href = window.location.origin + window.location.pathname;
+          }, 1500);
+        }
+      }
       if (session?.user) {
         setUser(session.user);
         // Check if user is admin

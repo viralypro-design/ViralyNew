@@ -224,48 +224,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onClose, 
   userEmail
 }) => {
-  const { subscription, loading } = useSubscription();
+  const { subscription, loading, refresh } = useSubscription();
   const planAccess = usePlanAccess(subscription);
   const [updates, setUpdates] = useState<UserUpdate[]>([]);
-  const [loadingUpdates, setLoadingUpdates] = useState(true);
+  const [loadingUpdates, setLoadingUpdates] = useState(false);
 
   useEffect(() => {
-    if (isOpen && subscription) {
-      loadUpdates();
-    }
-  }, [isOpen, subscription]);
-
-  const loadUpdates = async () => {
-    if (!subscription) {
+    // לא לטעון עדכונים - רק אם יש עדכונים דרך פאנל אדמין, הם יוצגו
+    if (isOpen) {
       setLoadingUpdates(false);
-      return;
-    }
-    
-    setLoadingUpdates(true);
-    try {
-      // נסה לטעון עדכונים מטבלת user_updates (אם קיימת)
-      const { data, error } = await supabase
-        .from('user_updates')
-        .select('*')
-        .eq('user_id', subscription.user_id)
-        .order('created_at', { ascending: false })
-        .limit(20);
-
-      if (error) {
-        // כל שגיאה - פשוט אין עדכונים
-        console.log('Error loading updates:', error.message);
-        setUpdates([]);
-      } else {
-        setUpdates(data || []);
-      }
-    } catch (err) {
-      console.log('Error loading updates:', err);
       setUpdates([]);
-    } finally {
-      // תמיד עצור את הטעינה
-      setLoadingUpdates(false);
     }
-  };
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -342,18 +312,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </Section>
           )}
 
-          <Section>
-            <h3>עדכונים והודעות</h3>
-            {loadingUpdates ? (
-              <div style={{ textAlign: 'center', padding: '20px', color: '#666' }}>
-                טוען...
-              </div>
-            ) : updates.length === 0 ? (
-              <EmptyState>
-                <div className="icon">📭</div>
-                <p>אין עדכונים חדשים</p>
-              </EmptyState>
-            ) : (
+          {updates.length > 0 && (
+            <Section>
+              <h3>עדכונים והודעות</h3>
               <UpdatesList>
                 {updates.map((update) => (
                   <UpdateItem key={update.id} $unread={!update.is_read}>
@@ -371,8 +332,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </UpdateItem>
                 ))}
               </UpdatesList>
-            )}
-          </Section>
+            </Section>
+          )}
         </ModalBody>
       </ModalContent>
     </ModalOverlay>

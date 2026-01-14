@@ -1,3 +1,33 @@
+/**
+ * ============================================================================
+ * ⚠️ READONLY MENTAL MODEL - DO NOT ADD LOGIC HERE ⚠️
+ * ============================================================================
+ * 
+ * This file is BOOTSTRAP ONLY - it initializes the app and connects components.
+ * 
+ * RULES:
+ * - DO NOT add business logic here
+ * - DO NOT add complex state management here
+ * - DO NOT add API calls here (except for auth)
+ * - DO NOT add subscription management here (use SubscriptionProvider)
+ * - DO NOT add plan access logic here (use usePlanAccess hook)
+ * 
+ * WHAT THIS FILE DOES:
+ * - Initializes React app
+ * - Sets up global styles
+ * - Connects components together
+ * - Handles basic auth state
+ * - Renders the main App component
+ * 
+ * WHERE TO ADD LOGIC:
+ * - Business logic → Components (AuthModal, SettingsModal, etc.)
+ * - Subscription logic → SubscriptionProvider
+ * - Plan access logic → usePlanAccess hook
+ * - API calls → lib/supabaseClient.ts or component-specific files
+ * 
+ * ============================================================================
+ */
+
 import React, { useState, useRef, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import styled, { createGlobalStyle, keyframes, css } from 'styled-components';

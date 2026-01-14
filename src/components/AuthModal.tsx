@@ -460,171 +460,74 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       if (signUpData?.user) {
         setSuccess('המשתמש נוצר בהצלחה! מתחבר...');
         
-        // המתן שהטריגר יוצר את ה-subscription
-        await new Promise(resolve => setTimeout(resolve, 1500));
+        console.log('[AuthModal] User created, waiting for trigger to create subscription...', {
+          user_id: signUpData.user.id,
+          plan_type: selectedPlan,
+          default_track: selectedTrack
+        });
         
-        // בדוק אם יש subscription, אם לא - צור אותו ידנית
-        const { data: existingSubscription } = await supabase
-          .from('user_subscriptions')
-          .select('*')
-          .eq('user_id', signUpData.user.id)
-          .single();
-        
-        // עדכן את ה-subscription עם החבילה והתחום
-        let subscriptionUpdated = false;
-        
-        if (!existingSubscription) {
-          // אם אין subscription, צור אותו ידנית
-          console.log('[AuthModal] Creating subscription manually:', {
-            user_id: signUpData.user.id,
-            plan_type: selectedPlan,
-            default_track: selectedTrack
-          });
+        // המתן שהטריגר יוצר את ה-subscription (עד 3 שניות)
+        let subscriptionCreated = false;
+        let subscriptionCheck;
+        for (let i = 0; i < 6; i++) {
+          await new Promise(resolve => setTimeout(resolve, 500));
           
-          // יצירת subscription - בלי default_track אם הטור לא קיים
-          const subscriptionData: any = {
-            user_id: signUpData.user.id,
-            plan_type: selectedPlan,
-            status: 'active',
-            minutes_used_monthly: 0,
-            analyses_used_monthly: 0
-          };
-          
-          // הוסף default_track רק אם יש selectedTrack
-          if (selectedTrack) {
-            subscriptionData.default_track = selectedTrack;
-          }
-          
-          const { data: newSubscription, error: subError } = await supabase
+          const { data: subCheck, error: subError } = await supabase
             .from('user_subscriptions')
-            .insert(subscriptionData)
-            .select()
-            .single();
-          
-          if (subError) {
-            console.error('[AuthModal] Error creating subscription:', subError);
-            // נסה דרך RPC אם יש שגיאה
-            if (selectedTrack) {
-              try {
-                const { error: trackError } = await supabase.rpc('update_user_default_track', {
-                  p_user_id: signUpData.user.id,
-                  p_default_track: selectedTrack
-                });
-                if (trackError) {
-                  console.error('[AuthModal] Error updating default track via RPC:', trackError);
-                } else {
-                  subscriptionUpdated = true;
-                }
-              } catch (err) {
-                console.error('[AuthModal] Error updating default track:', err);
-              }
-            }
-          } else {
-            console.log('[AuthModal] Subscription created successfully:', newSubscription);
-            subscriptionUpdated = true;
-          }
-        } else {
-          // עדכן את ה-subscription עם החבילה והתחום
-          console.log('[AuthModal] Updating existing subscription:', {
-            user_id: signUpData.user.id,
-            plan_type: selectedPlan,
-            default_track: selectedTrack
-          });
-          
-          // עדכון subscription - נסה עם default_track, אם נכשל - נסה בלי
-          const updateData: any = { plan_type: selectedPlan };
-          if (selectedTrack) {
-            updateData.default_track = selectedTrack;
-          }
-          
-          let updatedSubscription;
-          let updateError;
-          
-          // נסה לעדכן עם default_track
-          const { data: updatedWithTrack, error: errorWithTrack } = await supabase
-            .from('user_subscriptions')
-            .update(updateData)
+            .select('*')
             .eq('user_id', signUpData.user.id)
-            .select()
-            .single();
+            .maybeSingle();
           
-          // אם יש שגיאה שקשורה ל-default_track, נסה בלי
-          if (errorWithTrack && errorWithTrack.message?.includes('default_track')) {
-            console.warn('[AuthModal] default_track column may not exist, trying without it');
-            const updateDataWithoutTrack = { plan_type: selectedPlan };
-            const { data: updatedWithoutTrack, error: errorWithoutTrack } = await supabase
-              .from('user_subscriptions')
-              .update(updateDataWithoutTrack)
-              .eq('user_id', signUpData.user.id)
-              .select()
-              .single();
-            
-            updatedSubscription = updatedWithoutTrack;
-            updateError = errorWithoutTrack;
-            
-            // אם עדיין יש selectedTrack, נסה דרך RPC
-            if (!errorWithoutTrack && selectedTrack) {
-              try {
-                const { error: trackError } = await supabase.rpc('update_user_default_track', {
-                  p_user_id: signUpData.user.id,
-                  p_default_track: selectedTrack
-                });
-                if (trackError) {
-                  console.warn('[AuthModal] RPC update_user_default_track failed (column may not exist):', trackError);
-                }
-              } catch (err) {
-                console.warn('[AuthModal] RPC update_user_default_track error:', err);
-              }
-            }
-          } else {
-            updatedSubscription = updatedWithTrack;
-            updateError = errorWithTrack;
-          }
-          
-          if (updateError) {
-            console.error('[AuthModal] Error updating subscription:', updateError);
-            // נסה דרך RPC אם יש default_track
-            if (selectedTrack) {
-              try {
-                const { error: trackError } = await supabase.rpc('update_user_default_track', {
-                  p_user_id: signUpData.user.id,
-                  p_default_track: selectedTrack
-                });
-                if (trackError) {
-                  console.error('[AuthModal] Error updating default track via RPC:', trackError);
-                } else {
-                  subscriptionUpdated = true;
-                }
-              } catch (err) {
-                console.error('[AuthModal] Error updating default track:', err);
-              }
-            }
-          } else {
-            console.log('[AuthModal] Subscription updated successfully:', updatedSubscription);
-            subscriptionUpdated = true;
+          if (subCheck && !subError) {
+            subscriptionCreated = true;
+            subscriptionCheck = subCheck;
+            console.log('[AuthModal] Subscription found:', subCheck);
+            break;
           }
         }
         
-        // המתן שהעדכון יושלם לפני התחברות
-        if (subscriptionUpdated) {
-          console.log('[AuthModal] Subscription updated, waiting before sign in...');
-          await new Promise(resolve => setTimeout(resolve, 1000));
-        } else {
-          console.log('[AuthModal] Subscription update may have failed, waiting longer...');
-          await new Promise(resolve => setTimeout(resolve, 2000));
+        if (!subscriptionCreated) {
+          console.error('[AuthModal] Subscription was not created by trigger!');
+          setError('שגיאה ביצירת מנוי. אנא נסה שוב או פנה לתמיכה.');
+          setLoading(false);
+          return;
         }
         
-        // בדוק שוב את ה-subscription לפני התחברות כדי לוודא שהכל מעודכן
+        // עדכן את default_track דרך RPC (אם נדרש)
+        if (selectedTrack && subscriptionCheck) {
+          console.log('[AuthModal] Updating default_track via RPC:', {
+            user_id: signUpData.user.id,
+            default_track: selectedTrack
+          });
+          
+          const { error: trackError } = await supabase.rpc('update_user_default_track', {
+            p_user_id: signUpData.user.id,
+            p_default_track: selectedTrack
+          });
+          
+          if (trackError) {
+            console.error('[AuthModal] Error updating default_track via RPC:', trackError);
+            // לא נכשל - רק נדווח
+          } else {
+            console.log('[AuthModal] Default track updated successfully');
+            // המתן קצת לעדכון
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
+        }
+        
+        // בדיקה סופית לפני התחברות
         const { data: finalSubscriptionCheck } = await supabase
           .from('user_subscriptions')
           .select('*')
           .eq('user_id', signUpData.user.id)
-          .single();
+          .maybeSingle();
         
         console.log('[AuthModal] Final subscription check before sign in:', {
           subscription: finalSubscriptionCheck,
           expected_plan: selectedPlan,
-          expected_track: selectedTrack
+          expected_track: selectedTrack,
+          plan_match: finalSubscriptionCheck?.plan_type === selectedPlan,
+          track_match: !selectedTrack || finalSubscriptionCheck?.default_track === selectedTrack
         });
         
         const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({

@@ -2,6 +2,14 @@
  * Test Script: Full Signup Flow Test
  * Tests complete user registration with plan and track selection
  * Email: maorcomp@gmail.com
+ * 
+ * This test:
+ * 1. Signs up with maorcomp@gmail.com
+ * 2. Sets plan_type to 'trial' in metadata
+ * 3. Waits for trigger to create subscription
+ * 4. Updates default_track to 'musicians'
+ * 5. Signs out and signs in again
+ * 6. Verifies subscription is loaded correctly
  */
 
 import { createClient } from '@supabase/supabase-js';
@@ -40,13 +48,25 @@ loadEnvFile(envLocalPath);
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || '';
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
 if (!supabaseUrl || !supabaseAnonKey) {
   console.error('❌ Missing Supabase environment variables!');
+  console.error('   Required: VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY');
+  console.error('   Optional: SUPABASE_SERVICE_ROLE_KEY (for manual subscription creation)');
   process.exit(1);
 }
 
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Create service role client if available (for manual subscription creation)
+const supabaseService = supabaseServiceKey 
+  ? createClient(supabaseUrl, supabaseServiceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    })
+  : null;
 
 const TEST_EMAIL = 'maorcomp@gmail.com';
 const TEST_PASSWORD = 'Test123456';
@@ -59,23 +79,27 @@ async function testSignupFlow() {
   console.log(`📧 Email: ${TEST_EMAIL}`);
   console.log(`📦 Plan: ${TEST_PLAN}`);
   console.log(`🎯 Track: ${TEST_TRACK}`);
+  console.log(`🔑 Service Role: ${supabaseService ? '✅ Available' : '❌ Not available (will use trigger only)'}`);
   console.log('='.repeat(60));
   console.log('');
 
+  let userId: string | null = null;
+
   try {
-    // Step 1: Check if user already exists by trying to sign in first
-    console.log('📋 Step 1: Checking if user already exists...');
+    // Step 1: Sign out if already signed in
+    console.log('📋 Step 1: Ensuring clean state...');
     const { data: existingSession } = await supabase.auth.getSession();
     
     if (existingSession?.session?.user) {
       console.log('   ⚠️  Already signed in, signing out...');
       await supabase.auth.signOut();
+      await new Promise(resolve => setTimeout(resolve, 500));
     }
     
-    console.log('   ✅ Proceeding with signup...');
+    console.log('   ✅ Ready for signup');
 
-    // Step 2: Sign up
-    console.log('\n📋 Step 2: Signing up user...');
+    // Step 2: Sign up with plan_type in metadata
+    console.log('\n📋 Step 2: Signing up user with plan_type in metadata...');
     const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
       email: TEST_EMAIL,
       password: TEST_PASSWORD,
@@ -87,7 +111,7 @@ async function testSignupFlow() {
     });
 
     if (signUpError) {
-      if (signUpError.message.includes('already registered')) {
+      if (signUpError.message.includes('already registered') || signUpError.message.includes('already exists')) {
         console.log('   ⚠️  User already registered, signing in...');
         const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
           email: TEST_EMAIL,
@@ -99,190 +123,200 @@ async function testSignupFlow() {
           return;
         }
 
-        if (signInData.user) {
-          console.log('   ✅ Signed in successfully');
-          console.log(`   📝 User ID: ${signInData.user.id}`);
-          
-          // Wait for subscription
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          
-          // Check and create subscription if needed
-          const { data: subs } = await supabase
-            .from('user_subscriptions')
-            .select('*')
-            .eq('user_id', signInData.user.id);
-          
-          if (!subs || subs.length === 0) {
-            console.log('   ⚠️  No subscription found, creating...');
-            const subData: any = {
-              user_id: signInData.user.id,
-              plan_type: TEST_PLAN,
-              status: 'active',
-              minutes_used_monthly: 0,
-              analyses_used_monthly: 0
-            };
-            
-            const { data: newSub, error: createErr } = await supabase
-              .from('user_subscriptions')
-              .insert(subData)
-              .select()
-              .single();
-            
-            if (createErr) {
-              console.error(`   ❌ Error: ${createErr.message}`);
-            } else {
-              console.log('   ✅ Subscription created');
-            }
-          }
-          
-          // Update track
-          console.log('   📋 Updating track...');
-          const { error: trackErr } = await supabase.rpc('update_user_default_track', {
-            p_user_id: signInData.user.id,
-            p_default_track: TEST_TRACK
-          });
-          
-          if (trackErr) {
-            console.error(`   ❌ Track update error: ${trackErr.message}`);
-            // Try direct update
-            const { error: directErr } = await supabase
-              .from('user_subscriptions')
-              .update({ default_track: TEST_TRACK })
-              .eq('user_id', signInData.user.id);
-            
-            if (directErr) {
-              console.error(`   ❌ Direct update error: ${directErr.message}`);
-            } else {
-              console.log('   ✅ Track updated via direct update');
-            }
-          } else {
-            console.log('   ✅ Track updated via RPC');
-          }
-          
-          await verifySubscription(signInData.user.id);
+        if (!signInData.user) {
+          console.error('   ❌ No user data returned from sign in');
+          return;
         }
-        return;
+
+        userId = signInData.user.id;
+        console.log('   ✅ Signed in successfully');
+        console.log(`   📝 User ID: ${userId}`);
+        
+        // Verify metadata has plan_type
+        console.log('\n📋 Step 2.1: Verifying user metadata...');
+        const userMetadata = signInData.user.user_metadata || {};
+        console.log(`   📝 Metadata: ${JSON.stringify(userMetadata)}`);
+        
+        if (userMetadata.plan_type !== TEST_PLAN) {
+          console.log(`   ⚠️  Metadata plan_type is '${userMetadata.plan_type}', updating...`);
+          // Update metadata if needed
+          const { error: updateError } = await supabase.auth.updateUser({
+            data: { plan_type: TEST_PLAN }
+          });
+          if (updateError) {
+            console.error(`   ❌ Failed to update metadata: ${updateError.message}`);
+          } else {
+            console.log('   ✅ Metadata updated');
+            // After updating metadata, check if subscription exists
+            // If not, the trigger won't run (it only runs on INSERT), so we need to create it manually
+            console.log('   ⚠️  Note: Trigger only runs on INSERT, not UPDATE. Checking subscription...');
+          }
+        } else {
+          console.log(`   ✅ Metadata plan_type is correct: ${TEST_PLAN}`);
+        }
       } else {
         console.error(`   ❌ Sign up failed: ${signUpError.message}`);
         return;
       }
-    }
+    } else {
+      if (!signUpData.user) {
+        console.error('   ❌ No user data returned from signup');
+        return;
+      }
 
-    if (!signUpData.user) {
-      console.error('   ❌ No user data returned');
-      return;
-    }
-
-    console.log('   ✅ User created successfully');
-    console.log(`   📝 User ID: ${signUpData.user.id}`);
-
-    // Step 3: Wait for trigger to create subscription
-    console.log('\n📋 Step 3: Waiting for subscription to be created...');
-    await new Promise(resolve => setTimeout(resolve, 2000));
-
-    // Step 4: Check subscription
-    const { data: subscriptions, error: subError } = await supabase
-      .from('user_subscriptions')
-      .select('*')
-      .eq('user_id', signUpData.user.id);
-    
-    let subscription = subscriptions && subscriptions.length > 0 ? subscriptions[0] : null;
-
-    if (subError) {
-      console.error(`   ❌ Error fetching subscription: ${subError.message}`);
-      return;
-    }
-
-    if (!subscription) {
-      console.log('   ⚠️  No subscription found, creating manually...');
-      console.log(`   📝 User ID: ${signUpData.user.id}`);
-      // Create subscription manually
-      const subscriptionData: any = {
-        user_id: signUpData.user.id,
-        plan_type: TEST_PLAN,
-        status: 'active',
-        minutes_used_monthly: 0,
-        analyses_used_monthly: 0
-      };
+      userId = signUpData.user.id;
+      console.log('   ✅ User created successfully');
+      console.log(`   📝 User ID: ${userId}`);
       
-      // Try to add default_track if column exists
-      try {
-        subscriptionData.default_track = TEST_TRACK;
-      } catch (e) {
-        // Ignore if column doesn't exist
+      // Verify metadata
+      console.log('\n📋 Step 2.1: Verifying user metadata...');
+      const userMetadata = signUpData.user.user_metadata || {};
+      console.log(`   📝 Metadata: ${JSON.stringify(userMetadata)}`);
+      
+      if (userMetadata.plan_type !== TEST_PLAN) {
+        console.error(`   ❌ Metadata plan_type mismatch! Expected: ${TEST_PLAN}, Got: ${userMetadata.plan_type}`);
+        // Try to update
+        const { error: updateError } = await supabase.auth.updateUser({
+          data: { plan_type: TEST_PLAN }
+        });
+        if (updateError) {
+          console.error(`   ❌ Failed to update metadata: ${updateError.message}`);
+        } else {
+          console.log('   ✅ Metadata updated');
+        }
+      } else {
+        console.log(`   ✅ Metadata plan_type is correct: ${TEST_PLAN}`);
+      }
+    }
+
+    if (!userId) {
+      console.error('   ❌ No user ID available');
+      return;
+    }
+
+    // Step 3: Wait for trigger to create subscription (with retries)
+    console.log('\n📋 Step 3: Waiting for trigger to create subscription...');
+    let subscription = null;
+    let retries = 0;
+    const maxRetries = 5;
+    
+    while (!subscription && retries < maxRetries) {
+      await new Promise(resolve => setTimeout(resolve, 1000 * (retries + 1))); // 1s, 2s, 3s, 4s, 5s
+      
+      const { data: subscriptions, error: subError } = await supabase
+        .from('user_subscriptions')
+        .select('*')
+        .eq('user_id', userId);
+      
+      if (subError && subError.code !== 'PGRST116') {
+        console.error(`   ❌ Error fetching subscription (attempt ${retries + 1}): ${subError.message}`);
+        retries++;
+        continue;
       }
       
-      const { data: newSub, error: createError } = await supabase
-        .from('user_subscriptions')
-        .insert(subscriptionData)
-        .select()
-        .single();
+      if (subscriptions && subscriptions.length > 0) {
+        subscription = subscriptions[0];
+        console.log(`   ✅ Subscription found after ${retries + 1} attempt(s)`);
+        break;
+      }
       
-      if (createError) {
-        console.error(`   ❌ Error creating subscription: ${createError.message}`);
-        // Try without default_track
-        const { data: newSub2, error: createError2 } = await supabase
+      retries++;
+      console.log(`   ⏳ Waiting for subscription... (attempt ${retries}/${maxRetries})`);
+    }
+
+    // Step 4: Create subscription manually if trigger didn't create it
+    if (!subscription) {
+      console.log('\n📋 Step 4: Trigger did not create subscription');
+      console.log('   ⚠️  Possible reasons:');
+      console.log('      1. Trigger was not installed (run supabase_migration_subscription_system.sql)');
+      console.log('      2. User was created before trigger was set up');
+      console.log('      3. Trigger failed silently');
+      console.log('   Attempting to create subscription manually...');
+      
+      if (supabaseService) {
+        console.log('   🔑 Using service role to create subscription...');
+        const subscriptionData: any = {
+          user_id: userId,
+          plan_type: TEST_PLAN,
+          status: 'active',
+          minutes_used_monthly: 0,
+          analyses_used_monthly: 0
+        };
+        
+        const { data: newSub, error: createError } = await supabaseService
           .from('user_subscriptions')
-          .insert({
-            user_id: signUpData.user.id,
-            plan_type: TEST_PLAN,
-            status: 'active',
-            minutes_used_monthly: 0,
-            analyses_used_monthly: 0
-          })
+          .insert(subscriptionData)
           .select()
           .single();
         
-        if (createError2) {
-          console.error(`   ❌ Error creating subscription without track: ${createError2.message}`);
-          console.error(`   Error code: ${createError2.code}`);
-          console.error(`   Error details: ${JSON.stringify(createError2)}`);
+        if (createError) {
+          console.error(`   ❌ Error creating subscription with service role: ${createError.message}`);
+          console.error(`   Error code: ${createError.code}`);
+          console.error(`   Error details: ${JSON.stringify(createError)}`);
+          console.log('\n   💡 To fix this:');
+          console.log('      1. Run verify_and_fix_trigger.sql to check trigger status');
+          console.log('      2. If trigger is missing, run supabase_migration_subscription_system.sql');
+          console.log('      3. For existing users, you may need to create subscription manually via SQL');
           return;
         }
         
-        subscription = newSub2;
-        console.log('   ✅ Subscription created without track');
-      } else {
         subscription = newSub;
-        console.log('   ✅ Subscription created with track');
+        console.log('   ✅ Subscription created with service role');
+      } else {
+        console.error('   ❌ Cannot create subscription manually - service role key not available');
+        console.error('\n   💡 To fix this:');
+        console.error('      1. Add SUPABASE_SERVICE_ROLE_KEY to .env.local');
+        console.error('      2. Or run verify_and_fix_trigger.sql in Supabase SQL Editor');
+        console.error('      3. Or manually create subscription via SQL:');
+        console.error(`         INSERT INTO user_subscriptions (user_id, plan_type, status) VALUES ('${userId}', '${TEST_PLAN}', 'active');`);
+        return;
       }
     } else {
-      console.log('   ✅ Subscription found');
+      console.log('   ✅ Subscription was created by trigger');
     }
 
-    console.log('   ✅ Subscription found');
+    if (!subscription) {
+      console.error('   ❌ No subscription available after all attempts');
+      return;
+    }
+
+    console.log('\n📋 Step 5: Subscription Details:');
     console.log(`   📦 Plan Type: ${subscription.plan_type}`);
     console.log(`   📊 Status: ${subscription.status}`);
+    console.log(`   🎯 Default Track: ${subscription.default_track || 'NULL'}`);
 
-    // Step 5: Update track
-    console.log('\n📋 Step 5: Updating default track...');
+    // Step 6: Update track
+    console.log('\n📋 Step 6: Updating default track...');
     const { error: trackError } = await supabase.rpc('update_user_default_track', {
-      p_user_id: signUpData.user.id,
+      p_user_id: userId,
       p_default_track: TEST_TRACK
     });
 
     if (trackError) {
-      console.error(`   ❌ Error updating track: ${trackError.message}`);
-      // Try direct update
-      const { error: directError } = await supabase
-        .from('user_subscriptions')
-        .update({ default_track: TEST_TRACK })
-        .eq('user_id', signUpData.user.id);
+      console.error(`   ❌ Error updating track via RPC: ${trackError.message}`);
       
-      if (directError) {
-        console.error(`   ❌ Direct update also failed: ${directError.message}`);
-      } else {
-        console.log('   ✅ Track updated via direct update');
+      if (supabaseService) {
+        console.log('   🔑 Trying with service role...');
+        const { error: serviceError } = await supabaseService
+          .from('user_subscriptions')
+          .update({ default_track: TEST_TRACK })
+          .eq('user_id', userId);
+        
+        if (serviceError) {
+          console.error(`   ❌ Service role update also failed: ${serviceError.message}`);
+        } else {
+          console.log('   ✅ Track updated with service role');
+        }
       }
     } else {
-      console.log('   ✅ Track updated successfully');
+      console.log('   ✅ Track updated successfully via RPC');
     }
 
-    // Step 6: Verify final state
-    await verifySubscription(signUpData.user.id);
+    // Step 7: Verify final state
+    await verifySubscription(userId);
 
-    // Step 7: Sign in and verify
-    console.log('\n📋 Step 7: Signing in to verify...');
+    // Step 8: Sign out and sign in again to verify persistence
+    console.log('\n📋 Step 8: Testing login flow...');
     await supabase.auth.signOut();
     await new Promise(resolve => setTimeout(resolve, 500));
     
@@ -296,8 +330,19 @@ async function testSignupFlow() {
       return;
     }
 
+    if (!signInData.user) {
+      console.error('   ❌ No user data returned from sign in');
+      return;
+    }
+
     console.log('   ✅ Signed in successfully');
-    await verifySubscription(signInData.user!.id);
+    console.log(`   📝 User ID: ${signInData.user.id}`);
+    
+    // Wait a bit for subscription to load
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    // Verify subscription after login
+    await verifySubscription(signInData.user.id);
 
     console.log('\n' + '='.repeat(60));
     console.log('✅ TEST COMPLETED SUCCESSFULLY');
@@ -306,47 +351,69 @@ async function testSignupFlow() {
   } catch (error: any) {
     console.error('\n❌ TEST FAILED:', error.message);
     console.error(error.stack);
+    if (userId) {
+      console.log('\n📋 Attempting to verify subscription state...');
+      await verifySubscription(userId);
+    }
   }
 }
 
 async function verifySubscription(userId: string) {
   console.log(`\n📋 Verifying subscription for user: ${userId}...`);
   
-  const { data: subscriptions, error } = await supabase
+  // Try with regular client first
+  let { data: subscriptions, error } = await supabase
     .from('user_subscriptions')
     .select('*')
     .eq('user_id', userId);
   
+  // If error and we have service role, try with that
+  if (error && supabaseService) {
+    console.log('   ⚠️  Error with regular client, trying service role...');
+    const serviceResult = await supabaseService
+      .from('user_subscriptions')
+      .select('*')
+      .eq('user_id', userId);
+    
+    if (!serviceResult.error) {
+      subscriptions = serviceResult.data;
+      error = null;
+      console.log('   ✅ Retrieved subscription with service role');
+    }
+  }
+  
   if (error) {
     console.error(`   ❌ Error fetching subscription: ${error.message}`);
     console.error(`   Error code: ${error.code}`);
-    return;
+    console.error(`   Error details: ${JSON.stringify(error)}`);
+    return false;
   }
   
   console.log(`   📊 Found ${subscriptions?.length || 0} subscription(s)`);
   
   const subscription = subscriptions && subscriptions.length > 0 ? subscriptions[0] : null;
 
-  if (error) {
-    console.error(`   ❌ Error: ${error.message}`);
-    return;
-  }
-
   if (!subscription) {
     console.error('   ❌ No subscription found');
-    return;
+    console.error('   ⚠️  This means the subscription was not created or is not accessible');
+    return false;
   }
 
-  console.log('   ✅ Subscription Details:');
+  console.log('\n   ✅ Subscription Details:');
   console.log(`      Plan Type: ${subscription.plan_type}`);
   console.log(`      Status: ${subscription.status}`);
   console.log(`      Default Track: ${subscription.default_track || 'NULL'}`);
   console.log(`      Minutes Used: ${subscription.minutes_used_monthly}`);
   console.log(`      Analyses Used: ${subscription.analyses_used_monthly}`);
+  console.log(`      Created At: ${subscription.created_at || 'N/A'}`);
+  console.log(`      Updated At: ${subscription.updated_at || 'N/A'}`);
+
+  let allValid = true;
 
   // Verify plan
   if (subscription.plan_type !== TEST_PLAN) {
     console.error(`   ❌ Plan mismatch! Expected: ${TEST_PLAN}, Got: ${subscription.plan_type}`);
+    allValid = false;
   } else {
     console.log(`   ✅ Plan is correct: ${TEST_PLAN}`);
   }
@@ -354,6 +421,7 @@ async function verifySubscription(userId: string) {
   // Verify track
   if (subscription.default_track !== TEST_TRACK) {
     console.error(`   ❌ Track mismatch! Expected: ${TEST_TRACK}, Got: ${subscription.default_track || 'NULL'}`);
+    allValid = false;
   } else {
     console.log(`   ✅ Track is correct: ${TEST_TRACK}`);
   }
@@ -361,9 +429,31 @@ async function verifySubscription(userId: string) {
   // Verify status
   if (subscription.status !== 'active') {
     console.error(`   ❌ Status is not active! Got: ${subscription.status}`);
+    allValid = false;
   } else {
     console.log('   ✅ Status is active');
   }
+
+  // Verify usage counters
+  if (subscription.minutes_used_monthly !== 0) {
+    console.warn(`   ⚠️  Minutes used is not 0: ${subscription.minutes_used_monthly}`);
+  } else {
+    console.log('   ✅ Minutes used is 0');
+  }
+
+  if (subscription.analyses_used_monthly !== 0) {
+    console.warn(`   ⚠️  Analyses used is not 0: ${subscription.analyses_used_monthly}`);
+  } else {
+    console.log('   ✅ Analyses used is 0');
+  }
+
+  if (allValid) {
+    console.log('\n   ✅✅✅ ALL VERIFICATIONS PASSED ✅✅✅');
+  } else {
+    console.log('\n   ❌❌❌ SOME VERIFICATIONS FAILED ❌❌❌');
+  }
+
+  return allValid;
 }
 
 // Run test

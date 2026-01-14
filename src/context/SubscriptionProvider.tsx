@@ -24,7 +24,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  async function loadSubscription() {
+  async function loadSubscription(retryCount = 0) {
     setLoading(true);
     setError(null);
 
@@ -46,20 +46,52 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     }
 
     // Try to get subscription - if admin, might not have one, that's OK
-    const { data, error } = await supabase
+    // נסה לקרוא את כל העמודות כולל default_track (אם קיים)
+    let { data, error } = await supabase
       .from('user_subscriptions')
-      .select('*')
+      .select('user_id, plan_type, status, minutes_used_monthly, analyses_used_monthly, created_at, updated_at, default_track')
       .eq('user_id', session.user.id)
       .maybeSingle(); // Use maybeSingle instead of single to avoid error if no row
+
+    // אם יש שגיאה בגלל עמודה שלא קיימת (default_track), נסה בלי זה
+    if (error && (error.code === 'PGRST204' || error.message?.includes('406') || error.message?.includes('column') || error.message?.includes('does not exist'))) {
+      console.warn('[SubscriptionProvider] Error with default_track column, trying without it:', error.message);
+      const { data: dataWithoutTrack, error: errorWithoutTrack } = await supabase
+        .from('user_subscriptions')
+        .select('user_id, plan_type, status, minutes_used_monthly, analyses_used_monthly, created_at, updated_at')
+        .eq('user_id', session.user.id)
+        .maybeSingle();
+      
+      if (errorWithoutTrack) {
+        error = errorWithoutTrack;
+      } else {
+        data = dataWithoutTrack;
+        error = null;
+      }
+    }
 
     if (error) {
       if (error.code === 'PGRST116') {
         // אין subscription – המשתמש עדיין לא בחר חבילה
+        // אם זה אחרי התחברות חדשה, נסה שוב (יכול להיות שהטריגר עדיין לא רץ)
+        if (retryCount < 3) {
+          console.log(`[SubscriptionProvider] No subscription found, retrying... (${retryCount + 1}/3)`);
+          setTimeout(() => {
+            loadSubscription(retryCount + 1);
+          }, 1000 * (retryCount + 1)); // 1s, 2s, 3s
+          return;
+        }
         setSubscription(null);
       } else {
         setError(error.message);
+        console.error('[SubscriptionProvider] Error loading subscription:', error);
       }
     } else {
+      console.log('[SubscriptionProvider] Subscription loaded:', {
+        plan_type: data?.plan_type,
+        default_track: (data as any)?.default_track,
+        status: data?.status
+      });
       setSubscription(data);
     }
 
@@ -71,8 +103,16 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
 
     const {
       data: { subscription: authListener },
-    } = supabase.auth.onAuthStateChange(() => {
-      loadSubscription();
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('[SubscriptionProvider] Auth state changed:', event, session?.user?.id);
+      // אחרי התחברות או אימות, נסה לטעון את ה-subscription עם retry
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        // המתן קצת שהטריגר/עדכונים יושלמו
+        await new Promise(resolve => setTimeout(resolve, 500));
+        loadSubscription(0);
+      } else {
+        loadSubscription(0);
+      }
     });
 
     return () => {

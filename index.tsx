@@ -11,6 +11,7 @@ import { SettingsModal } from '@/components/SettingsModal';
 import { AdminPanel } from '@/components/AdminPanel';
 import { SimplePlanManager } from '@/components/SimplePlanManager';
 import { PlanTester } from '@/components/PlanTester';
+import { TestUserInterface } from '@/components/TestUserInterface';
 import { usePlanAccess } from '@/hooks/usePlanAccess';
 import { PLAN_CONFIG } from '@/config/planConfig';
 import { PlanType } from '@/types/subscription';
@@ -3190,61 +3191,19 @@ const ai = new GoogleGenAI({ apiKey });
       
       {/* ממשק בדיקות למשתמש viralytest@test.com */}
       {showTestInterface && isTestUser && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0, 0, 0, 0.95)',
-          zIndex: 3000,
-          overflowY: 'auto',
-          padding: '20px'
-        }}>
-          <div style={{
-            maxWidth: '1200px',
-            margin: '0 auto',
-            position: 'relative'
-          }}>
-            <button
-              onClick={() => setShowTestInterface(false)}
-              style={{
-                position: 'fixed',
-                top: '20px',
-                right: '20px',
-                background: 'rgba(212, 160, 67, 0.2)',
-                border: '2px solid #D4A043',
-                color: '#D4A043',
-                borderRadius: '50%',
-                width: '50px',
-                height: '50px',
-                fontSize: '24px',
-                cursor: 'pointer',
-                zIndex: 3001,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontWeight: 'bold'
-              }}
-            >
-              ✕
-            </button>
-            
-            <div style={{ marginBottom: '30px' }}>
-              <h1 style={{ color: '#D4A043', textAlign: 'center', marginBottom: '10px' }}>
-                🧪 ממשק בדיקות - viralytest@test.com
-              </h1>
-              <p style={{ color: '#888', textAlign: 'center' }}>
-                ממשק בדיקות מלא: מעבר בין חבילות, בחירת תחומים, בחירת מומחים ועוד
-              </p>
-            </div>
-            
-            <SimplePlanManager />
-            <div style={{ marginTop: '30px' }}>
-              <PlanTester />
-            </div>
-          </div>
-        </div>
+        <TestUserInterface
+          onClose={() => setShowTestInterface(false)}
+          currentTrack={activeTrack}
+          onTrackChange={(track) => handleTrackChange(track)}
+          selectedExperts={selectedExperts}
+          onExpertToggle={(expert) => {
+            if (selectedExperts.includes(expert)) {
+              setSelectedExperts(selectedExperts.filter(e => e !== expert));
+            } else {
+              setSelectedExperts([...selectedExperts, expert]);
+            }
+          }}
+        />
       )}
     </>
   );

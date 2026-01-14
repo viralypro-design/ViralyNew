@@ -2849,26 +2849,52 @@ const ai = new GoogleGenAI({ apiKey });
             }
             
             // כשיש משתמש מחובר - בדוק הגבלות
-            const maxTracks = planAccess?.maxTracks || 4;
+            // אם אין planAccess, לא להציג תחומים (המשתמש צריך subscription)
+            if (!planAccess || !subscription) {
+              return (
+                <TrackCard 
+                  key={track.id}
+                  $active={false}
+                  style={{
+                    opacity: 0.3,
+                    cursor: 'not-allowed',
+                    position: 'relative'
+                  }}
+                >
+                  {track.icon}
+                  <span>{track.label}</span>
+                  <div style={{
+                    position: 'absolute',
+                    top: '5px',
+                    right: '5px',
+                    background: '#ff4d4d',
+                    color: '#fff',
+                    padding: '2px 8px',
+                    borderRadius: '4px',
+                    fontSize: '0.7rem',
+                    fontWeight: 700
+                  }}>
+                    🔒
+                  </div>
+                </TrackCard>
+              );
+            }
+            
+            const maxTracks = planAccess.maxTracks;
             
             // בחבילת נסיון ויוצרים (maxTracks = 1) - אפשר לבחור תחום אחד
             // אם יש default_track, רק התחום הזה פתוח
             let isDisabled = false;
-            if (planAccess) {
-              if (maxTracks <= 1) {
-                // אם יש default_track, רק התחום הזה פתוח
-                if (subscription?.default_track) {
-                  isDisabled = track.id !== subscription.default_track;
-                } else {
-                  // אם אין default_track, כל התחומים פתוחים לבחירה (אבל רק אחד)
-                  isDisabled = false;
-                }
+            if (maxTracks <= 1) {
+              // אם יש default_track, רק התחום הזה פתוח
+              if (subscription.default_track) {
+                isDisabled = track.id !== subscription.default_track;
               } else {
-                // בחבילת יוצרים באקסטרים (maxTracks > 1) - כל התחומים פתוחים
+                // אם אין default_track, כל התחומים פתוחים לבחירה (אבל רק אחד)
                 isDisabled = false;
               }
             } else {
-              // אם אין planAccess, כל התחומים פתוחים (למקרה של משתמש חדש)
+              // בחבילת יוצרים באקסטרים (maxTracks > 1) - כל התחומים פתוחים
               isDisabled = false;
             }
             
@@ -3033,6 +3059,8 @@ const ai = new GoogleGenAI({ apiKey });
               <UploadSubtitle>
                 {user && planAccess 
                   ? `עד ${planAccess.maxVideoMinutes} דקות או ${planAccess.maxVideoMB}MB`
+                  : user && !subscription
+                  ? 'נא לבחור חבילה כדי להמשיך'
                   : 'עד 5 דקות או 20MB'}
               </UploadSubtitle>
               
@@ -3087,20 +3115,32 @@ const ai = new GoogleGenAI({ apiKey });
                 setIsPlansModalOpen(true);
                 return;
               }
+              // אם יש משתמש אבל אין subscription - פתח חלון חבילות
+              if (!subscription || !planAccess) {
+                alert('נא לבחור חבילה כדי להמשיך. אם נרשמת זה עתה, אנא המתן שהחבילה תתעדכן או רענן את הדף.');
+                setIsPlansModalOpen(true);
+                return;
+              }
               // אם יש משתמש אבל אין הרשאה - פתח חלון חבילות
-              if (!planAccess || !planAccess.canRunAnalysis() || !planAccess.hasMinutesLeft()) {
+              if (!planAccess.canRunAnalysis() || !planAccess.hasMinutesLeft()) {
                 setIsPlansModalOpen(true);
                 return;
               }
               // אחרת - הרץ ניתוח
               handleGenerate();
             }}
-            disabled={loading || !isReady}
-            $isReady={isReady}
+            disabled={loading || !isReady || !planAccess}
+            $isReady={isReady && !!planAccess}
             $isLoading={loading}
           >
             {loading ? 'צוות המומחים צופה כעת בסרטון' : (isImprovementMode ? 'נתח שיפורים' : 'אקשן !')}
           </ActionButton>
+          {user && !subscription && (
+            <ErrorMsg>אין חבילה פעילה. אם נרשמת זה עתה, אנא המתן שהחבילה תתעדכן או רענן את הדף.</ErrorMsg>
+          )}
+          {user && subscription && !planAccess && (
+            <ErrorMsg>שגיאה בטעינת החבילה. נא לרענן את הדף או ליצור קשר עם התמיכה.</ErrorMsg>
+          )}
           {user && planAccess && !planAccess.canRunAnalysis() && (
             <ErrorMsg>הגעת למכסת הניתוחים החודשית. שדרג את החבילה להמשך.</ErrorMsg>
           )}

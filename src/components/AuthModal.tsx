@@ -548,13 +548,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           }
         } else if (signInData?.session) {
           setSuccess('נרשמת והתחברת בהצלחה!');
-          // רענן את ה-subscription
-          setTimeout(async () => {
-            // רענן את ה-subscription דרך context
-            await new Promise(resolve => setTimeout(resolve, 500));
+          // המתן קצת לפני סגירה כדי שה-subscription יתעדכן
+          setTimeout(() => {
             onSuccess();
             onClose();
-          }, 500);
+          }, 1000);
         }
       }
     } catch (err: any) {

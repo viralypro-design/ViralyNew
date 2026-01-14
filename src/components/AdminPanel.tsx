@@ -590,15 +590,31 @@ export const AdminPanel: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
   const handleUpdateUserPlan = async (userId: string, planType: PlanType) => {
     try {
-      const { error } = await supabase.rpc('update_user_plan', {
+      const { error } = await supabase.rpc('update_user_plan_admin', {
         p_user_id: userId,
         p_plan_type: planType
       });
       if (error) throw error;
       await loadUsers();
-    } catch (error) {
+      alert('חבילת המשתמש עודכנה בהצלחה');
+    } catch (error: any) {
       console.error('Error updating user plan:', error);
-      alert('שגיאה בעדכון חבילת המשתמש');
+      alert(`שגיאה בעדכון חבילת המשתמש: ${error.message || 'Unknown error'}`);
+    }
+  };
+
+  const handleUpdateUserRole = async (userId: string, role: 'user' | 'admin') => {
+    try {
+      const { error } = await supabase.rpc('update_user_role', {
+        p_user_id: userId,
+        p_role: role
+      });
+      if (error) throw error;
+      await loadUsers();
+      alert('תפקיד המשתמש עודכן בהצלחה');
+    } catch (error: any) {
+      console.error('Error updating user role:', error);
+      alert(`שגיאה בעדכון תפקיד המשתמש: ${error.message || 'Unknown error'}`);
     }
   };
 
@@ -785,6 +801,15 @@ export const AdminPanel: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                     }
                   }}>
                     ערוך חבילה
+                  </ActionButton>
+                  <ActionButton onClick={() => {
+                    const currentRole = user.raw_user_meta_data?.role || 'user';
+                    const newRole = currentRole === 'admin' ? 'user' : 'admin';
+                    if (confirm(`האם אתה בטוח שברצונך לשנות את תפקיד המשתמש ל-${newRole === 'admin' ? 'אדמין' : 'משתמש'}?`)) {
+                      handleUpdateUserRole(user.id, newRole);
+                    }
+                  }}>
+                    {user.raw_user_meta_data?.role === 'admin' ? 'הסר אדמין' : 'הפוך לאדמין'}
                   </ActionButton>
                   <DangerButton onClick={() => handleDeleteUser(user.id)}>
                     מחק
@@ -1063,18 +1088,35 @@ export const AdminPanel: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                     <TableCell>{benefit.is_active ? 'פעיל' : 'לא פעיל'}</TableCell>
                     <TableCell>
                       <ActionButton onClick={async () => {
-                        const { error } = await supabase
-                          .from('benefits')
-                          .update({ is_active: !benefit.is_active })
-                          .eq('id', benefit.id);
-                        if (!error) await loadBenefits();
+                        try {
+                          const { error } = await supabase.rpc('update_benefit', {
+                            p_benefit_id: benefit.id,
+                            p_benefit_data: {
+                              is_active: !benefit.is_active
+                            }
+                          });
+                          if (error) throw error;
+                          await loadBenefits();
+                        } catch (error: any) {
+                          console.error('Error updating benefit:', error);
+                          alert(`שגיאה בעדכון הטבה: ${error.message || 'Unknown error'}`);
+                        }
                       }}>
                         {benefit.is_active ? 'השבת' : 'הפעל'}
                       </ActionButton>
                       <DangerButton onClick={async () => {
                         if (confirm('האם אתה בטוח שברצונך למחוק הטבה זו?')) {
-                          const { error } = await supabase.from('benefits').delete().eq('id', benefit.id);
-                          if (!error) await loadBenefits();
+                          try {
+                            const { error } = await supabase.rpc('delete_benefit', {
+                              p_benefit_id: benefit.id
+                            });
+                            if (error) throw error;
+                            await loadBenefits();
+                            alert('הטבה נמחקה בהצלחה');
+                          } catch (error: any) {
+                            console.error('Error deleting benefit:', error);
+                            alert(`שגיאה במחיקת הטבה: ${error.message || 'Unknown error'}`);
+                          }
                         }
                       }}>
                         מחק

@@ -390,6 +390,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </UpdatesList>
             )}
           </Section>
+
+          {isAdmin && onOpenAdminPanel && (
+            <Section>
+              <AdminButton onClick={() => {
+                onClose();
+                onOpenAdminPanel();
+              }}>
+                🔧 פאנל ניהול מתקדם
+              </AdminButton>
+            </Section>
+          )}
         </ModalBody>
       </ModalContent>
     </ModalOverlay>

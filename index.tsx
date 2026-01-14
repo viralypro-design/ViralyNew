@@ -2547,7 +2547,13 @@ const ai = new GoogleGenAI({ apiKey });
             isOpen={isSettingsModalOpen}
             onClose={() => setIsSettingsModalOpen(false)}
             userEmail={user.email}
+            isAdmin={isAdmin}
+            onOpenAdminPanel={() => setShowAdminPanel(true)}
           />
+        )}
+        
+        {showAdminPanel && (
+          <AdminPanel onBack={() => setShowAdminPanel(false)} />
         )}
 
 

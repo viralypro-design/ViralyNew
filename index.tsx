@@ -1759,7 +1759,26 @@ const App = () => {
   
   // Subscription and plan access
   const { subscription, loading: subscriptionLoading } = useSubscription();
-  const planAccess = usePlanAccess(subscription);
+  const basePlanAccess = usePlanAccess(subscription);
+  
+  // אם המשתמש הוא אדמין, תן לו את כל היכולות (creators_extreme)
+  const planAccess = isAdmin ? (() => {
+    const adminPlan = PLAN_CONFIG['creators_extreme'];
+    return {
+      planLabel: 'אדמין - גישה מלאה',
+      maxExperts: adminPlan.maxExperts,
+      maxTracks: adminPlan.maxTracks,
+      maxVideoMinutes: adminPlan.maxVideoMinutes,
+      maxVideoMB: adminPlan.maxVideoMB,
+      hasFeature: (feature: string) => true, // כל הפיצ'רים פתוחים
+      canUploadVideo: () => true, // ללא הגבלות
+      canRunAnalysis: () => true, // ללא הגבלות
+      hasMinutesLeft: () => true, // ללא הגבלות
+      canAddStudent: () => true, // ללא הגבלות
+      canSelectExpert: () => true, // ללא הגבלות
+      canSelectTrack: () => true, // ללא הגבלות
+    };
+  })() : basePlanAccess;
   
   const handleUpgradePlan = async (newPlan: PlanType) => {
     if (!subscription) return;
@@ -2455,13 +2474,19 @@ const ai = new GoogleGenAI({ apiKey });
                   🚪 התנתק
                 </LogoutButton>
                 <LogoutButton 
-                  onClick={() => setIsSettingsModalOpen(true)}
+                  onClick={() => {
+                    if (isAdmin) {
+                      setShowAdminPanel(true);
+                    } else {
+                      setIsSettingsModalOpen(true);
+                    }
+                  }}
                   style={{ 
                     padding: '8px 16px',
                     fontSize: '0.85rem'
                   }}
                 >
-                  ⚙️ הגדרות
+                  ⚙️ {isAdmin ? 'פאנל ניהול' : 'הגדרות'}
                 </LogoutButton>
               </div>
             </div>

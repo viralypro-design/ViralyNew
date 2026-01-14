@@ -239,9 +239,16 @@ export const PlansInfoModal: React.FC<PlansInfoModalProps> = ({
   };
 
   return (
-    <ModalOverlay onClick={onClose}>
+    <ModalOverlay onClick={(e) => {
+      if (e.target === e.currentTarget) {
+        onClose();
+      }
+    }}>
       <ModalContent onClick={e => e.stopPropagation()}>
-        <ModalCloseBtn onClick={onClose}>✕</ModalCloseBtn>
+        <ModalCloseBtn onClick={(e) => {
+          e.stopPropagation();
+          onClose();
+        }}>✕</ModalCloseBtn>
         <ModalHeader>
           <h2>📦 חבילות והצעות</h2>
           <p>בחר את החבילה המתאימה לך ביותר</p>

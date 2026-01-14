@@ -296,10 +296,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const maxAnalyses = planConfig?.maxAnalysesPerMonth === -1 ? '∞' : planConfig?.maxAnalysesPerMonth || 0;
 
   return (
-    <ModalOverlay onClick={onClose}>
+    <ModalOverlay onClick={(e) => {
+      if (e.target === e.currentTarget) {
+        onClose();
+      }
+    }}>
       <ModalContent onClick={e => e.stopPropagation()}>
         <CloseButton 
           onClick={(e) => {
+            e.preventDefault();
             e.stopPropagation();
             onClose();
           }}

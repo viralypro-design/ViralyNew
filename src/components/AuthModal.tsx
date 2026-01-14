@@ -511,9 +511,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   return (
     <>
-      <ModalOverlay onClick={onClose}>
+      <ModalOverlay onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}>
         <ModalContent onClick={e => e.stopPropagation()}>
-          <CloseButton onClick={onClose}>✕</CloseButton>
+          <CloseButton onClick={(e) => {
+            e.stopPropagation();
+            onClose();
+          }}>✕</CloseButton>
           <ModalHeader>
             <h2>{mode === 'login' ? 'התחברות' : 'הרשמה'}</h2>
             <p>{mode === 'login' ? 'התחבר לחשבון שלך' : 'צור חשבון חדש והתחל להשתמש'}</p>

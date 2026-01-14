@@ -97,7 +97,43 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         setSubscription(data);
       } else {
         console.warn('[SubscriptionProvider] No subscription found for user:', session.user.id);
-        console.warn('[SubscriptionProvider] This user needs a subscription. Run fix_user_subscription_maorcomp.sql or create subscription manually.');
+        
+        // נסה ליצור subscription אוטומטית אם יש plan_type ב-metadata
+        const planType = session.user.user_metadata?.plan_type;
+        if (planType && ['trial', 'creators', 'creators_extreme', 'coach', 'coach_pro'].includes(planType)) {
+          console.log('[SubscriptionProvider] Found plan_type in metadata, attempting to create subscription...', {
+            user_id: session.user.id,
+            plan_type: planType,
+            default_track: session.user.user_metadata?.default_track
+          });
+          
+          try {
+            const { data: rpcData, error: rpcError } = await supabase.rpc('create_user_subscription', {
+              p_user_id: session.user.id,
+              p_plan_type: planType,
+              p_default_track: session.user.user_metadata?.default_track || null
+            });
+            
+            if (rpcError) {
+              console.error('[SubscriptionProvider] Failed to create subscription via RPC:', rpcError);
+              console.warn('[SubscriptionProvider] User needs subscription. Please create it manually or contact support.');
+            } else if (rpcData?.success) {
+              console.log('[SubscriptionProvider] Subscription created successfully via RPC:', rpcData);
+              // המתן קצת ואז טען שוב
+              await new Promise(resolve => setTimeout(resolve, 500));
+              // טען את ה-subscription שוב
+              loadSubscription(0);
+              return; // יצא מהפונקציה, loadSubscription יטען את הנתונים
+            } else {
+              console.error('[SubscriptionProvider] RPC returned error:', rpcData);
+            }
+          } catch (err: any) {
+            console.error('[SubscriptionProvider] Error creating subscription:', err);
+          }
+        } else {
+          console.warn('[SubscriptionProvider] No plan_type in metadata. User needs to choose a plan.');
+        }
+        
         setSubscription(null);
       }
     }

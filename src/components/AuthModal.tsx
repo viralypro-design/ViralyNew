@@ -487,10 +487,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         }
         
         if (!subscriptionCreated) {
-          console.error('[AuthModal] Subscription was not created by trigger!');
-          setError('שגיאה ביצירת מנוי. אנא נסה שוב או פנה לתמיכה.');
-          setLoading(false);
-          return;
+          console.warn('[AuthModal] Subscription was not created by trigger.');
+          console.log('[AuthModal] This might be because:');
+          console.log('  1. User already existed (trigger only runs on new INSERT)');
+          console.log('  2. Trigger is not installed');
+          console.log('  3. Trigger failed silently');
+          console.log('[AuthModal] Continuing with sign-in - subscription will be checked after login.');
+          
+          // נמשיך עם התחברות - ה-SubscriptionProvider ינסה לטעון את ה-subscription
+          // אם אין subscription, המשתמש יראה הודעה מתאימה
         }
         
         // עדכן את default_track דרך RPC (אם נדרש)

@@ -13,10 +13,11 @@ DECLARE
   v_plan_type text;
   v_subscription_exists boolean;
 BEGIN
-  -- מציאת המשתמש
+  -- מציאת המשתמש - נסה לפי email או user_id
   SELECT id, raw_user_meta_data->>'plan_type' INTO v_user_id, v_plan_type
   FROM auth.users
-  WHERE email = 'maorcomp@gmail.com'
+  WHERE email = 'maorcomp@gmail.com' 
+     OR id = '08608158-5604-4415-b045-655890779a3b'::uuid
   LIMIT 1;
   
   IF v_user_id IS NULL THEN
@@ -74,6 +75,7 @@ END $$;
 -- הצגת התוצאה הסופית
 SELECT 
   u.email,
+  u.id as user_id,
   us.plan_type,
   us.status,
   us.default_track,
@@ -83,7 +85,8 @@ SELECT
   us.updated_at
 FROM auth.users u
 LEFT JOIN public.user_subscriptions us ON u.id = us.user_id
-WHERE u.email = 'maorcomp@gmail.com';
+WHERE u.email = 'maorcomp@gmail.com' 
+   OR u.id = '08608158-5604-4415-b045-655890779a3b'::uuid;
 
 COMMIT;
 

@@ -87,12 +87,19 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         console.error('[SubscriptionProvider] Error loading subscription:', error);
       }
     } else {
-      console.log('[SubscriptionProvider] Subscription loaded:', {
-        plan_type: data?.plan_type,
-        default_track: (data as any)?.default_track,
-        status: data?.status
-      });
-      setSubscription(data);
+      if (data) {
+        console.log('[SubscriptionProvider] Subscription loaded:', {
+          plan_type: data.plan_type,
+          default_track: (data as any)?.default_track,
+          status: data.status,
+          user_id: data.user_id
+        });
+        setSubscription(data);
+      } else {
+        console.warn('[SubscriptionProvider] No subscription found for user:', session.user.id);
+        console.warn('[SubscriptionProvider] This user needs a subscription. Run fix_user_subscription_maorcomp.sql or create subscription manually.');
+        setSubscription(null);
+      }
     }
 
     setLoading(false);

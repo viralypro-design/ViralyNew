@@ -1825,28 +1825,38 @@ const App = () => {
   // Listen to auth changes (but don't auto-check on mount)
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('[App] Auth state changed:', event, session?.user?.id);
+      
       // טיפול באימות אימייל
       if (event === 'SIGNED_IN' && session) {
         const urlParams = new URLSearchParams(window.location.search);
         const hashParams = new URLSearchParams(window.location.hash.substring(1));
         if (urlParams.get('type') === 'email' || hashParams.get('type') === 'email') {
+          console.log('[App] Email verification detected, reloading page...');
           // המשתמש אימת את האימייל - רענן את הדף כדי לטעון את ה-subscription
           setTimeout(() => {
             window.location.href = window.location.origin + window.location.pathname;
           }, 1500);
         }
       }
+      
       if (session?.user) {
         setUser(session.user);
         // Check if user is admin
         const userRole = session.user.user_metadata?.role;
         const isAdminUser = userRole === 'admin';
         setIsAdmin(isAdminUser);
+        console.log('[App] User logged in:', {
+          id: session.user.id,
+          email: session.user.email,
+          isAdmin: isAdminUser
+        });
         // Don't auto-open admin panel - user needs to click Settings button
       } else {
         setUser(null);
         setIsAdmin(false);
         setShowAdminPanel(false);
+        console.log('[App] User logged out');
       }
       setCheckingAuth(false);
     });
@@ -1876,22 +1886,48 @@ const App = () => {
 
   // הגדר תחום ראשוני לפי החבילה או default_track של המשתמש
   useEffect(() => {
-    if (!user || !subscription || !planAccess) return;
+    if (!user) return;
+    
+    // אם עדיין טוען את ה-subscription, המתן
+    if (subscriptionLoading) {
+      console.log('[App] Waiting for subscription to load...');
+      return;
+    }
+    
+    // אם אין subscription או planAccess, לא לעדכן את התחום
+    if (!subscription || !planAccess) {
+      console.log('[App] No subscription or planAccess yet:', { subscription, planAccess });
+      return;
+    }
+    
+    console.log('[App] Setting initial track:', {
+      default_track: subscription.default_track,
+      plan_type: subscription.plan_type,
+      maxTracks: planAccess.maxTracks,
+      currentTrack: activeTrack
+    });
     
     // אם יש default_track ב-subscription, השתמש בו
     if (subscription.default_track && ['actors', 'musicians', 'creators', 'influencers'].includes(subscription.default_track)) {
-      setActiveTrack(subscription.default_track as TrackId);
+      if (activeTrack !== subscription.default_track) {
+        console.log('[App] Setting track from subscription.default_track:', subscription.default_track);
+        setActiveTrack(subscription.default_track as TrackId);
+      }
       return;
     }
     
     // אם החבילה מוגבלת לתחום אחד (trial או creators) ואין default_track, הגדר את actors כברירת מחדל
     if (planAccess.maxTracks === 1 && !subscription.default_track) {
-      setActiveTrack('actors');
+      if (activeTrack !== 'actors') {
+        console.log('[App] Setting track to actors (default for single-track plan)');
+        setActiveTrack('actors');
+      }
     }
-  }, [planAccess, subscription, user]);
+  }, [planAccess, subscription, user, subscriptionLoading, activeTrack]);
   
   // בדיקה אם משתמש חדש צריך לבחור תחום
   const [showTrackSelectionModal, setShowTrackSelectionModal] = useState(false);
+  const [isSavingTrack, setIsSavingTrack] = useState(false);
   
   useEffect(() => {
     if (!user || !subscription || !planAccess) return;
@@ -1966,15 +2002,35 @@ const App = () => {
     // שמור את התחום הנבחר כברירת מחדל
     if (subscription && ['actors', 'musicians', 'creators', 'influencers'].includes(id)) {
       try {
-        const { error } = await supabase.rpc('update_user_default_track', {
+        console.log('[handleTrackChange] Saving default track:', { user_id: user.id, track: id });
+        const { data, error } = await supabase.rpc('update_user_default_track', {
           p_user_id: user.id,
           p_default_track: id
         });
         if (error) {
-          console.error('Error saving default track:', error);
+          console.error('[handleTrackChange] Error saving default track:', error);
+          // נסה לעדכן ישירות דרך הטבלה
+          const { error: updateError } = await supabase
+            .from('user_subscriptions')
+            .update({ default_track: id })
+            .eq('user_id', user.id);
+          if (updateError) {
+            console.error('[handleTrackChange] Direct update also failed:', updateError);
+          } else {
+            console.log('[handleTrackChange] Track saved via direct update');
+          }
+        } else {
+          console.log('[handleTrackChange] Track saved successfully via RPC:', data);
+          // וודא שהעדכון נשמר
+          const { data: verifySubscription } = await supabase
+            .from('user_subscriptions')
+            .select('default_track')
+            .eq('user_id', user.id)
+            .single();
+          console.log('[handleTrackChange] Verified subscription after save:', verifySubscription);
         }
       } catch (err) {
-        console.error('Error saving default track:', err);
+        console.error('[handleTrackChange] Error saving default track:', err);
       }
     }
     
@@ -2684,17 +2740,55 @@ const ai = new GoogleGenAI({ apiKey });
                     key={track.id}
                     $active={activeTrack === track.id}
                     onClick={async () => {
-                      await handleTrackChange(track.id);
-                      setShowTrackSelectionModal(false);
+                      if (isSavingTrack) return; // מניעת לחיצות מרובות
+                      setIsSavingTrack(true);
+                      try {
+                        await handleTrackChange(track.id);
+                        // המתן קצת כדי שהעדכון יסתיים
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                        // רענון ה-subscription כדי לוודא שהעדכון נשמר
+                        if (subscription) {
+                          const { data: updatedSubscription } = await supabase
+                            .from('user_subscriptions')
+                            .select('*')
+                            .eq('user_id', user.id)
+                            .single();
+                          if (updatedSubscription?.default_track === track.id) {
+                            console.log('[TrackSelection] Track saved successfully:', track.id);
+                            setShowTrackSelectionModal(false);
+                          } else {
+                            console.warn('[TrackSelection] Track may not have been saved, retrying...');
+                            // נסה שוב
+                            await supabase.rpc('update_user_default_track', {
+                              p_user_id: user.id,
+                              p_default_track: track.id
+                            });
+                            setShowTrackSelectionModal(false);
+                          }
+                        } else {
+                          setShowTrackSelectionModal(false);
+                        }
+                      } catch (err) {
+                        console.error('[TrackSelection] Error saving track:', err);
+                        alert('שגיאה בשמירת התחום. נסה שוב.');
+                      } finally {
+                        setIsSavingTrack(false);
+                      }
                     }}
                     style={{
-                      cursor: 'pointer',
+                      cursor: isSavingTrack ? 'wait' : 'pointer',
                       padding: '20px',
-                      textAlign: 'center'
+                      textAlign: 'center',
+                      opacity: isSavingTrack ? 0.7 : 1
                     }}
                   >
                     {track.icon}
                     <span style={{ display: 'block', marginTop: '10px' }}>{track.label}</span>
+                    {isSavingTrack && activeTrack === track.id && (
+                      <div style={{ marginTop: '10px', color: '#D4A043', fontSize: '0.9rem' }}>
+                        שומר...
+                      </div>
+                    )}
                   </TrackCard>
                 ))}
               </div>
@@ -3076,9 +3170,42 @@ const ai = new GoogleGenAI({ apiKey });
   );
 };
 
-const root = createRoot(document.getElementById('root')!);
-root.render(
-  <SubscriptionProvider>
-    <App />
-  </SubscriptionProvider>
-);
+// טיפול בשגיאות בטעינת האפליקציה
+try {
+  const rootElement = document.getElementById('root');
+  if (!rootElement) {
+    throw new Error('Root element not found');
+  }
+  
+  const root = createRoot(rootElement);
+  root.render(
+    <SubscriptionProvider>
+      <App />
+    </SubscriptionProvider>
+  );
+} catch (error) {
+  console.error('Error starting application:', error);
+  const rootElement = document.getElementById('root');
+  if (rootElement) {
+    rootElement.innerHTML = `
+      <div style="
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        padding: 20px;
+        text-align: center;
+        font-family: 'Assistant', sans-serif;
+        color: #e0e0e0;
+        background-color: #050505;
+      ">
+        <h1 style="color: #D4A043; margin-bottom: 20px;">שגיאה בטעינת האפליקציה</h1>
+        <p style="margin-bottom: 10px;">${error instanceof Error ? error.message : 'Unknown error'}</p>
+        <p style="color: #888; font-size: 14px; margin-top: 20px;">
+          אנא בדוק את הקונסול לפרטים נוספים
+        </p>
+      </div>
+    `;
+  }
+}

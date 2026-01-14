@@ -363,7 +363,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [selectedPlan, setSelectedPlan] = useState<PlanType>(initialPlan || 'trial');
   const [selectedTrack, setSelectedTrack] = useState<string | null>(null);
   const [showPlanSelection, setShowPlanSelection] = useState(false);
-  const [showTrackSelection, setShowTrackSelection] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -471,68 +470,162 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           .eq('user_id', signUpData.user.id)
           .single();
         
-        // עדכן את ה-subscription עם החבילה והתחום באמצעות RPC
-        if (selectedTrack && (selectedPlan === 'trial' || selectedPlan === 'creators')) {
-          try {
-            const { error: trackError } = await supabase.rpc('update_user_default_track', {
-              p_user_id: signUpData.user.id,
-              p_default_track: selectedTrack
-            });
-            if (trackError) {
-              console.error('Error updating default track:', trackError);
-            }
-          } catch (err) {
-            console.error('Error updating default track:', err);
-          }
-        }
-
+        // עדכן את ה-subscription עם החבילה והתחום
+        let subscriptionUpdated = false;
+        
         if (!existingSubscription) {
           // אם אין subscription, צור אותו ידנית
-          const { error: subError } = await supabase
+          console.log('[AuthModal] Creating subscription manually:', {
+            user_id: signUpData.user.id,
+            plan_type: selectedPlan,
+            default_track: selectedTrack
+          });
+          
+          // יצירת subscription - בלי default_track אם הטור לא קיים
+          const subscriptionData: any = {
+            user_id: signUpData.user.id,
+            plan_type: selectedPlan,
+            status: 'active',
+            minutes_used_monthly: 0,
+            analyses_used_monthly: 0
+          };
+          
+          // הוסף default_track רק אם יש selectedTrack
+          if (selectedTrack) {
+            subscriptionData.default_track = selectedTrack;
+          }
+          
+          const { data: newSubscription, error: subError } = await supabase
             .from('user_subscriptions')
-            .insert({
-              user_id: signUpData.user.id,
-              plan_type: selectedPlan,
-              status: 'active',
-              minutes_used_monthly: 0,
-              analyses_used_monthly: 0,
-              default_track: selectedTrack || null
-            });
+            .insert(subscriptionData)
+            .select()
+            .single();
           
           if (subError) {
-            console.error('Error creating subscription:', subError);
-            // נמשיך גם אם יש שגיאה - אולי הטריגר יצר אותו
+            console.error('[AuthModal] Error creating subscription:', subError);
+            // נסה דרך RPC אם יש שגיאה
+            if (selectedTrack) {
+              try {
+                const { error: trackError } = await supabase.rpc('update_user_default_track', {
+                  p_user_id: signUpData.user.id,
+                  p_default_track: selectedTrack
+                });
+                if (trackError) {
+                  console.error('[AuthModal] Error updating default track via RPC:', trackError);
+                } else {
+                  subscriptionUpdated = true;
+                }
+              } catch (err) {
+                console.error('[AuthModal] Error updating default track:', err);
+              }
+            }
+          } else {
+            console.log('[AuthModal] Subscription created successfully:', newSubscription);
+            subscriptionUpdated = true;
           }
         } else {
           // עדכן את ה-subscription עם החבילה והתחום
+          console.log('[AuthModal] Updating existing subscription:', {
+            user_id: signUpData.user.id,
+            plan_type: selectedPlan,
+            default_track: selectedTrack
+          });
+          
+          // עדכון subscription - נסה עם default_track, אם נכשל - נסה בלי
           const updateData: any = { plan_type: selectedPlan };
           if (selectedTrack) {
             updateData.default_track = selectedTrack;
           }
           
-          const { error: updateError } = await supabase
+          let updatedSubscription;
+          let updateError;
+          
+          // נסה לעדכן עם default_track
+          const { data: updatedWithTrack, error: errorWithTrack } = await supabase
             .from('user_subscriptions')
             .update(updateData)
-            .eq('user_id', signUpData.user.id);
+            .eq('user_id', signUpData.user.id)
+            .select()
+            .single();
           
-          if (updateError) {
-            console.error('Error updating subscription:', updateError);
-            // נסה דרך RPC אם יש default_track
-            if (selectedTrack) {
+          // אם יש שגיאה שקשורה ל-default_track, נסה בלי
+          if (errorWithTrack && errorWithTrack.message?.includes('default_track')) {
+            console.warn('[AuthModal] default_track column may not exist, trying without it');
+            const updateDataWithoutTrack = { plan_type: selectedPlan };
+            const { data: updatedWithoutTrack, error: errorWithoutTrack } = await supabase
+              .from('user_subscriptions')
+              .update(updateDataWithoutTrack)
+              .eq('user_id', signUpData.user.id)
+              .select()
+              .single();
+            
+            updatedSubscription = updatedWithoutTrack;
+            updateError = errorWithoutTrack;
+            
+            // אם עדיין יש selectedTrack, נסה דרך RPC
+            if (!errorWithoutTrack && selectedTrack) {
               try {
-                await supabase.rpc('update_user_default_track', {
+                const { error: trackError } = await supabase.rpc('update_user_default_track', {
                   p_user_id: signUpData.user.id,
                   p_default_track: selectedTrack
                 });
+                if (trackError) {
+                  console.warn('[AuthModal] RPC update_user_default_track failed (column may not exist):', trackError);
+                }
               } catch (err) {
-                console.error('Error updating default track via RPC:', err);
+                console.warn('[AuthModal] RPC update_user_default_track error:', err);
               }
             }
+          } else {
+            updatedSubscription = updatedWithTrack;
+            updateError = errorWithTrack;
+          }
+          
+          if (updateError) {
+            console.error('[AuthModal] Error updating subscription:', updateError);
+            // נסה דרך RPC אם יש default_track
+            if (selectedTrack) {
+              try {
+                const { error: trackError } = await supabase.rpc('update_user_default_track', {
+                  p_user_id: signUpData.user.id,
+                  p_default_track: selectedTrack
+                });
+                if (trackError) {
+                  console.error('[AuthModal] Error updating default track via RPC:', trackError);
+                } else {
+                  subscriptionUpdated = true;
+                }
+              } catch (err) {
+                console.error('[AuthModal] Error updating default track:', err);
+              }
+            }
+          } else {
+            console.log('[AuthModal] Subscription updated successfully:', updatedSubscription);
+            subscriptionUpdated = true;
           }
         }
         
-        // רענן את ה-subscription לפני התחברות
-        await new Promise(resolve => setTimeout(resolve, 500));
+        // המתן שהעדכון יושלם לפני התחברות
+        if (subscriptionUpdated) {
+          console.log('[AuthModal] Subscription updated, waiting before sign in...');
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        } else {
+          console.log('[AuthModal] Subscription update may have failed, waiting longer...');
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+        
+        // בדוק שוב את ה-subscription לפני התחברות כדי לוודא שהכל מעודכן
+        const { data: finalSubscriptionCheck } = await supabase
+          .from('user_subscriptions')
+          .select('*')
+          .eq('user_id', signUpData.user.id)
+          .single();
+        
+        console.log('[AuthModal] Final subscription check before sign in:', {
+          subscription: finalSubscriptionCheck,
+          expected_plan: selectedPlan,
+          expected_track: selectedTrack
+        });
         
         const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
           email: email.trim().toLowerCase(),
@@ -547,6 +640,21 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             setError(`המשתמש נוצר אבל לא ניתן להתחבר: ${signInError.message}`);
           }
         } else if (signInData?.session) {
+          // בדוק שוב את ה-subscription אחרי התחברות
+          const { data: postLoginSubscription } = await supabase
+            .from('user_subscriptions')
+            .select('*')
+            .eq('user_id', signUpData.user.id)
+            .single();
+          
+          console.log('[AuthModal] Post-login subscription check:', {
+            subscription: postLoginSubscription,
+            expected_plan: selectedPlan,
+            expected_track: selectedTrack,
+            match: postLoginSubscription?.plan_type === selectedPlan && 
+                   (!selectedTrack || postLoginSubscription?.default_track === selectedTrack)
+          });
+          
           setSuccess('נרשמת והתחברת בהצלחה!');
           // המתן קצת לפני סגירה כדי שה-subscription יתעדכן
           setTimeout(() => {
@@ -661,62 +769,78 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   <span style={{ fontSize: '1.2rem' }}>▼</span>
                 </PlanSelectionButton>
 
-                {/* הצג חלון בחירת תחום אם נבחרה חבילת נסיון או יוצרים */}
+                {/* הצג dropdown בחירת תחום אם נבחרה חבילת נסיון או יוצרים */}
                 {(selectedPlan === 'trial' || selectedPlan === 'creators') && (
-                  <>
-                    {selectedTrack ? (
+                  <div style={{ marginTop: '15px' }}>
+                    <label 
+                      htmlFor="track-select"
+                      style={{
+                        display: 'block',
+                        color: '#D4A043',
+                        fontWeight: 600,
+                        marginBottom: '8px',
+                        fontSize: '0.95rem'
+                      }}
+                    >
+                      בחר תחום ניתוח: *
+                    </label>
+                    <select
+                      id="track-select"
+                      value={selectedTrack || ''}
+                      onChange={(e) => setSelectedTrack(e.target.value || null)}
+                      required
+                      style={{
+                        width: '100%',
+                        padding: '15px 20px',
+                        background: 'rgba(15, 15, 15, 0.8)',
+                        border: '1px solid rgba(212, 160, 67, 0.3)',
+                        borderRadius: '10px',
+                        color: '#e0e0e0',
+                        fontFamily: 'Assistant, sans-serif',
+                        fontSize: '1rem',
+                        cursor: 'pointer',
+                        transition: 'all 0.3s',
+                        appearance: 'none',
+                        backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23D4A043' d='M6 9L1 4h10z'/%3E%3C/svg%3E")`,
+                        backgroundRepeat: 'no-repeat',
+                        backgroundPosition: 'left 15px center',
+                        paddingRight: '15px',
+                        paddingLeft: '40px'
+                      }}
+                      onFocus={(e) => {
+                        e.target.style.borderColor = '#D4A043';
+                        e.target.style.boxShadow = '0 0 20px rgba(212, 160, 67, 0.2)';
+                      }}
+                      onBlur={(e) => {
+                        e.target.style.borderColor = 'rgba(212, 160, 67, 0.3)';
+                        e.target.style.boxShadow = 'none';
+                      }}
+                    >
+                      <option value="">-- בחר תחום ניתוח --</option>
+                      <option value="actors">שחקנים ואודישנים</option>
+                      <option value="musicians">זמרים ומוזיקאים</option>
+                      <option value="creators">יוצרי תוכן וכוכבי רשת</option>
+                      <option value="influencers">משפיענים ומותגים</option>
+                    </select>
+                    {selectedTrack && (
                       <div style={{ 
-                        marginTop: '15px', 
-                        padding: '15px', 
+                        marginTop: '8px', 
+                        padding: '10px', 
                         background: 'rgba(212, 160, 67, 0.1)', 
                         border: '1px solid rgba(212, 160, 67, 0.3)', 
-                        borderRadius: '8px',
-                        textAlign: 'right'
+                        borderRadius: '6px',
+                        fontSize: '0.9rem',
+                        color: '#D4A043'
                       }}>
-                        <div style={{ color: '#D4A043', fontWeight: 600, marginBottom: '5px' }}>
-                          תחום נבחר: {selectedTrack === 'actors' ? 'שחקנים ואודישנים' : 
-                                       selectedTrack === 'musicians' ? 'זמרים ומוזיקאים' :
-                                       selectedTrack === 'creators' ? 'יוצרי תוכן וכוכבי רשת' :
-                                       'משפיענים ומותגים'}
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => setShowTrackSelection(true)}
-                          style={{
-                            background: 'transparent',
-                            border: '1px solid rgba(212, 160, 67, 0.3)',
-                            color: '#D4A043',
-                            padding: '8px 15px',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            fontSize: '0.9rem',
-                            marginTop: '8px'
-                          }}
-                        >
-                          שנה תחום
-                        </button>
+                        ✓ תחום נבחר: {
+                          selectedTrack === 'actors' ? 'שחקנים ואודישנים' : 
+                          selectedTrack === 'musicians' ? 'זמרים ומוזיקאים' :
+                          selectedTrack === 'creators' ? 'יוצרי תוכן וכוכבי רשת' :
+                          'משפיענים ומותגים'
+                        }
                       </div>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => setShowTrackSelection(true)}
-                        style={{
-                          width: '100%',
-                          marginTop: '15px',
-                          padding: '15px',
-                          background: 'rgba(212, 160, 67, 0.1)',
-                          border: '2px dashed rgba(212, 160, 67, 0.5)',
-                          borderRadius: '8px',
-                          color: '#D4A043',
-                          cursor: 'pointer',
-                          fontSize: '1rem',
-                          fontWeight: 600
-                        }}
-                      >
-                        בחר תחום ניתוח
-                      </button>
                     )}
-                  </>
+                  </div>
                 )}
 
                 {error && <ErrorMsg>{error}</ErrorMsg>}
@@ -813,71 +937,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         </PlanModal>
       )}
 
-      {showTrackSelection && (
-        <PlanModal onClick={(e) => {
-          if (e.target === e.currentTarget) {
-            setShowTrackSelection(false);
-          }
-        }}>
-          <PlanModalContent onClick={e => e.stopPropagation()}>
-            <button
-              type="button"
-              style={{
-                position: 'absolute',
-                top: '20px',
-                right: '20px',
-                background: 'transparent',
-                border: '1px solid rgba(212, 160, 67, 0.3)',
-                color: '#D4A043',
-                width: '36px',
-                height: '36px',
-                borderRadius: '50%',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '20px',
-                zIndex: 10
-              }}
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                setShowTrackSelection(false);
-              }}
-            >
-              ✕
-            </button>
-            <PlanModalTitle>בחר תחום ניתוח</PlanModalTitle>
-            <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
-              gap: '15px',
-              marginTop: '20px'
-            }}>
-              {[
-                { id: 'actors', label: 'שחקנים ואודישנים' },
-                { id: 'musicians', label: 'זמרים ומוזיקאים' },
-                { id: 'creators', label: 'יוצרי תוכן וכוכבי רשת' },
-                { id: 'influencers', label: 'משפיענים ומותגים' }
-              ].map((track) => {
-                const isSelected = selectedTrack === track.id;
-                return (
-                  <PlanOption
-                    key={track.id}
-                    $selected={isSelected}
-                    onClick={() => {
-                      setSelectedTrack(track.id);
-                      setShowTrackSelection(false);
-                    }}
-                  >
-                    <h4>{track.label}</h4>
-                  </PlanOption>
-                );
-              })}
-            </div>
-          </PlanModalContent>
-        </PlanModal>
-      )}
     </>
   );
 };

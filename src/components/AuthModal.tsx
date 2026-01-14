@@ -498,7 +498,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           // אם אין subscription, המשתמש יראה הודעה מתאימה
         }
         
-        // עדכן את default_track דרך RPC (אם נדרש)
+        // עדכן את default_track דרך RPC (אם נדרש) - רק אם יש subscription
         if (selectedTrack && subscriptionCheck) {
           console.log('[AuthModal] Updating default_track via RPC:', {
             user_id: signUpData.user.id,
@@ -515,17 +515,40 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             // לא נכשל - רק נדווח
           } else {
             console.log('[AuthModal] Default track updated successfully');
-            // המתן קצת לעדכון
-            await new Promise(resolve => setTimeout(resolve, 500));
+            // המתן שהעדכון יסתיים ו-verify
+            await new Promise(resolve => setTimeout(resolve, 800));
+            
+            // וודא שהעדכון נשמר
+            const { data: verifySub } = await supabase
+              .from('user_subscriptions')
+              .select('default_track')
+              .eq('user_id', signUpData.user.id)
+              .maybeSingle();
+            
+            if (verifySub?.default_track === selectedTrack) {
+              console.log('[AuthModal] Default track verified successfully');
+            } else {
+              console.warn('[AuthModal] Default track update not verified, but continuing...');
+            }
           }
         }
         
-        // בדיקה סופית לפני התחברות
-        const { data: finalSubscriptionCheck } = await supabase
-          .from('user_subscriptions')
-          .select('*')
-          .eq('user_id', signUpData.user.id)
-          .maybeSingle();
+        // בדיקה סופית לפני התחברות - עם retry
+        let finalSubscriptionCheck = null;
+        for (let i = 0; i < 3; i++) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+          
+          const { data: subCheck, error: subError } = await supabase
+            .from('user_subscriptions')
+            .select('*')
+            .eq('user_id', signUpData.user.id)
+            .maybeSingle();
+          
+          if (subCheck && !subError) {
+            finalSubscriptionCheck = subCheck;
+            break;
+          }
+        }
         
         console.log('[AuthModal] Final subscription check before sign in:', {
           subscription: finalSubscriptionCheck,
@@ -548,27 +571,34 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             setError(`המשתמש נוצר אבל לא ניתן להתחבר: ${signInError.message}`);
           }
         } else if (signInData?.session) {
-          // בדוק שוב את ה-subscription אחרי התחברות
+          // המתן שהטריגר/עדכונים יושלמו לפני סגירה
+          // SubscriptionProvider יטען את הנתונים אחרי SIGNED_IN event
+          console.log('[AuthModal] User signed in, waiting for subscription to sync...');
+          
+          // המתן שהעדכונים יסתיימו
+          await new Promise(resolve => setTimeout(resolve, 1500));
+          
+          // בדוק שוב את ה-subscription אחרי המתנה
           const { data: postLoginSubscription } = await supabase
             .from('user_subscriptions')
             .select('*')
             .eq('user_id', signUpData.user.id)
-            .single();
+            .maybeSingle();
           
           console.log('[AuthModal] Post-login subscription check:', {
             subscription: postLoginSubscription,
             expected_plan: selectedPlan,
             expected_track: selectedTrack,
-            match: postLoginSubscription?.plan_type === selectedPlan && 
-                   (!selectedTrack || postLoginSubscription?.default_track === selectedTrack)
+            plan_match: postLoginSubscription?.plan_type === selectedPlan,
+            track_match: !selectedTrack || postLoginSubscription?.default_track === selectedTrack
           });
           
           setSuccess('נרשמת והתחברת בהצלחה!');
-          // המתן קצת לפני סגירה כדי שה-subscription יתעדכן
+          // קריאה ל-onSuccess תגרום ל-SubscriptionProvider לטעון מחדש
           setTimeout(() => {
             onSuccess();
             onClose();
-          }, 1000);
+          }, 500);
         }
       }
     } catch (err: any) {

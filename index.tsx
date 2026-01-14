@@ -1774,7 +1774,7 @@ const App = () => {
   const [showTestInterface, setShowTestInterface] = useState(false);
   
   // Subscription and plan access
-  const { subscription, loading: subscriptionLoading } = useSubscription();
+  const { subscription, loading: subscriptionLoading, refresh: refreshSubscription } = useSubscription();
   const basePlanAccess = usePlanAccess(subscription);
   
   // אם המשתמש הוא אדמין, תן לו את כל היכולות (creators_extreme)
@@ -2042,12 +2042,19 @@ const App = () => {
         } else {
           console.log('[handleTrackChange] Track saved successfully via RPC:', data);
           // וודא שהעדכון נשמר
+          await new Promise(resolve => setTimeout(resolve, 500));
           const { data: verifySubscription } = await supabase
             .from('user_subscriptions')
             .select('default_track')
             .eq('user_id', user.id)
-            .single();
+            .maybeSingle();
           console.log('[handleTrackChange] Verified subscription after save:', verifySubscription);
+          
+          // רענן את ה-subscription ב-Provider כדי שהעדכון יופיע מיד
+          if (verifySubscription?.default_track === id) {
+            console.log('[handleTrackChange] Refreshing subscription provider...');
+            await refreshSubscription();
+          }
         }
       } catch (err) {
         console.error('[handleTrackChange] Error saving default track:', err);

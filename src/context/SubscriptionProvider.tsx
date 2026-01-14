@@ -114,9 +114,16 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       console.log('[SubscriptionProvider] Auth state changed:', event, session?.user?.id);
       // אחרי התחברות או אימות, נסה לטעון את ה-subscription עם retry
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-        // המתן קצת שהטריגר/עדכונים יושלמו
-        await new Promise(resolve => setTimeout(resolve, 500));
+        // המתן שהטריגר/עדכונים יושלמו - זמן ארוך יותר ל-SIGNED_IN
+        const delay = event === 'SIGNED_IN' ? 1500 : 500;
+        console.log(`[SubscriptionProvider] Waiting ${delay}ms for trigger/updates to complete...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
         loadSubscription(0);
+      } else if (event === 'SIGNED_OUT') {
+        // אחרי התנתקות, נקה את ה-subscription מיד
+        setSubscription(null);
+        setLoading(false);
+        setError(null);
       } else {
         loadSubscription(0);
       }

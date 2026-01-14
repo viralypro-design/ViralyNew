@@ -90,6 +90,7 @@ const CloseButton = styled.button`
   justify-content: center;
   font-size: 20px;
   transition: all 0.3s;
+  z-index: 10;
   
   &:hover {
     background: rgba(212, 160, 67, 0.1);
@@ -360,7 +361,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [selectedPlan, setSelectedPlan] = useState<PlanType>(initialPlan || 'trial');
+  const [selectedTrack, setSelectedTrack] = useState<string | null>(null);
   const [showPlanSelection, setShowPlanSelection] = useState(false);
+  const [showTrackSelection, setShowTrackSelection] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -427,6 +430,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       return;
     }
 
+    // בדיקה שחבילת נסיון או יוצרים דורשת בחירת תחום
+    if ((selectedPlan === 'trial' || selectedPlan === 'creators') && !selectedTrack) {
+      setError('נא לבחור תחום ניתוח');
+      setLoading(false);
+      return;
+    }
+
     try {
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email: email.trim().toLowerCase(),
@@ -466,18 +476,24 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               plan_type: selectedPlan,
               status: 'active',
               minutes_used_monthly: 0,
-              analyses_used_monthly: 0
+              analyses_used_monthly: 0,
+              default_track: selectedTrack || null
             });
           
           if (subError) {
             console.error('Error creating subscription:', subError);
             // נמשיך גם אם יש שגיאה - אולי הטריגר יצר אותו
           }
-        } else if (existingSubscription.plan_type !== selectedPlan) {
-          // אם יש subscription אבל עם חבילה אחרת, עדכן אותו
+        } else {
+          // עדכן את ה-subscription עם החבילה והתחום
+          const updateData: any = { plan_type: selectedPlan };
+          if (selectedTrack) {
+            updateData.default_track = selectedTrack;
+          }
+          
           const { error: updateError } = await supabase
             .from('user_subscriptions')
-            .update({ plan_type: selectedPlan })
+            .update(updateData)
             .eq('user_id', signUpData.user.id);
           
           if (updateError) {
@@ -524,7 +540,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               e.stopPropagation();
               onClose();
             }}
-          >✕</CloseButton>
+          >
+            ✕
+          </CloseButton>
           <ModalHeader>
             <h2>{mode === 'login' ? 'התחברות' : 'הרשמה'}</h2>
             <p>{mode === 'login' ? 'התחבר לחשבון שלך' : 'צור חשבון חדש והתחל להשתמש'}</p>
@@ -604,11 +622,82 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   <span style={{ fontSize: '1.2rem' }}>▼</span>
                 </PlanSelectionButton>
 
+                {/* הצג חלון בחירת תחום אם נבחרה חבילת נסיון או יוצרים */}
+                {(selectedPlan === 'trial' || selectedPlan === 'creators') && (
+                  <>
+                    {selectedTrack ? (
+                      <div style={{ 
+                        marginTop: '15px', 
+                        padding: '15px', 
+                        background: 'rgba(212, 160, 67, 0.1)', 
+                        border: '1px solid rgba(212, 160, 67, 0.3)', 
+                        borderRadius: '8px',
+                        textAlign: 'right'
+                      }}>
+                        <div style={{ color: '#D4A043', fontWeight: 600, marginBottom: '5px' }}>
+                          תחום נבחר: {selectedTrack === 'actors' ? 'שחקנים ואודישנים' : 
+                                       selectedTrack === 'musicians' ? 'זמרים ומוזיקאים' :
+                                       selectedTrack === 'creators' ? 'יוצרי תוכן וכוכבי רשת' :
+                                       'משפיענים ומותגים'}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setShowTrackSelection(true)}
+                          style={{
+                            background: 'transparent',
+                            border: '1px solid rgba(212, 160, 67, 0.3)',
+                            color: '#D4A043',
+                            padding: '8px 15px',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontSize: '0.9rem',
+                            marginTop: '8px'
+                          }}
+                        >
+                          שנה תחום
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setShowTrackSelection(true)}
+                        style={{
+                          width: '100%',
+                          marginTop: '15px',
+                          padding: '15px',
+                          background: 'rgba(212, 160, 67, 0.1)',
+                          border: '2px dashed rgba(212, 160, 67, 0.5)',
+                          borderRadius: '8px',
+                          color: '#D4A043',
+                          cursor: 'pointer',
+                          fontSize: '1rem',
+                          fontWeight: 600
+                        }}
+                      >
+                        בחר תחום ניתוח
+                      </button>
+                    )}
+                  </>
+                )}
+
                 {error && <ErrorMsg>{error}</ErrorMsg>}
                 {success && <SuccessMsg>{success}</SuccessMsg>}
-                <SubmitButton type="submit" disabled={loading}>
+                <SubmitButton 
+                  type="submit" 
+                  disabled={loading || ((selectedPlan === 'trial' || selectedPlan === 'creators') && !selectedTrack)}
+                >
                   {loading ? 'נרשם...' : 'הרשמה'}
                 </SubmitButton>
+                {(selectedPlan === 'trial' || selectedPlan === 'creators') && !selectedTrack && (
+                  <div style={{ 
+                    color: '#ff4d4d', 
+                    fontSize: '0.85rem', 
+                    textAlign: 'center', 
+                    marginTop: '10px' 
+                  }}>
+                    נא לבחור תחום ניתוח
+                  </div>
+                )}
               </Form>
             )}
           </FormContainer>
@@ -616,8 +705,39 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       </ModalOverlay>
 
       {showPlanSelection && (
-        <PlanModal onClick={() => setShowPlanSelection(false)}>
+        <PlanModal onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            setShowPlanSelection(false);
+          }
+        }}>
           <PlanModalContent onClick={e => e.stopPropagation()}>
+            <button
+              type="button"
+              style={{
+                position: 'absolute',
+                top: '20px',
+                right: '20px',
+                background: 'transparent',
+                border: '1px solid rgba(212, 160, 67, 0.3)',
+                color: '#D4A043',
+                width: '36px',
+                height: '36px',
+                borderRadius: '50%',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '20px',
+                zIndex: 10
+              }}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setShowPlanSelection(false);
+              }}
+            >
+              ✕
+            </button>
             <PlanModalTitle>בחר חבילה</PlanModalTitle>
             <PlansGrid>
               {ACTIVE_PLANS.map((planType) => {
@@ -631,6 +751,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     onClick={() => {
                       setSelectedPlan(planType);
                       setShowPlanSelection(false);
+                      // אם החבילה היא נסיון או יוצרים, אפס את בחירת התחום
+                      if (planType === 'trial' || planType === 'creators') {
+                        setSelectedTrack(null);
+                      }
                     }}
                   >
                     <h4>{plan.label}</h4>
@@ -646,6 +770,72 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 );
               })}
             </PlansGrid>
+          </PlanModalContent>
+        </PlanModal>
+      )}
+
+      {showTrackSelection && (
+        <PlanModal onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            setShowTrackSelection(false);
+          }
+        }}>
+          <PlanModalContent onClick={e => e.stopPropagation()}>
+            <button
+              type="button"
+              style={{
+                position: 'absolute',
+                top: '20px',
+                right: '20px',
+                background: 'transparent',
+                border: '1px solid rgba(212, 160, 67, 0.3)',
+                color: '#D4A043',
+                width: '36px',
+                height: '36px',
+                borderRadius: '50%',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '20px',
+                zIndex: 10
+              }}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setShowTrackSelection(false);
+              }}
+            >
+              ✕
+            </button>
+            <PlanModalTitle>בחר תחום ניתוח</PlanModalTitle>
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+              gap: '15px',
+              marginTop: '20px'
+            }}>
+              {[
+                { id: 'actors', label: 'שחקנים ואודישנים' },
+                { id: 'musicians', label: 'זמרים ומוזיקאים' },
+                { id: 'creators', label: 'יוצרי תוכן וכוכבי רשת' },
+                { id: 'influencers', label: 'משפיענים ומותגים' }
+              ].map((track) => {
+                const isSelected = selectedTrack === track.id;
+                return (
+                  <PlanOption
+                    key={track.id}
+                    $selected={isSelected}
+                    onClick={() => {
+                      setSelectedTrack(track.id);
+                      setShowTrackSelection(false);
+                    }}
+                  >
+                    <h4>{track.label}</h4>
+                  </PlanOption>
+                );
+              })}
+            </div>
           </PlanModalContent>
         </PlanModal>
       )}

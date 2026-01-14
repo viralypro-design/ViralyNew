@@ -2575,13 +2575,11 @@ const ai = new GoogleGenAI({ apiKey });
           initialMode={authModalInitialMode}
         />
         
-        {user && (
+        {user && !isAdmin && (
           <SettingsModal
             isOpen={isSettingsModalOpen}
             onClose={() => setIsSettingsModalOpen(false)}
             userEmail={user.email}
-            isAdmin={isAdmin}
-            onOpenAdminPanel={() => setShowAdminPanel(true)}
           />
         )}
         

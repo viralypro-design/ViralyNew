@@ -236,7 +236,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   }, [isOpen, subscription]);
 
   const loadUpdates = async () => {
-    if (!subscription) return;
+    if (!subscription) {
+      setLoadingUpdates(false);
+      return;
+    }
     
     setLoadingUpdates(true);
     try {
@@ -248,9 +251,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         .order('created_at', { ascending: false })
         .limit(20);
 
-      if (error && error.code !== 'PGRST116') {
-        // PGRST116 = table doesn't exist - זה בסדר, פשוט אין עדכונים
-        console.log('No updates table yet:', error.message);
+      if (error) {
+        // כל שגיאה - פשוט אין עדכונים
+        console.log('Error loading updates:', error.message);
         setUpdates([]);
       } else {
         setUpdates(data || []);
@@ -259,6 +262,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       console.log('Error loading updates:', err);
       setUpdates([]);
     } finally {
+      // תמיד עצור את הטעינה
       setLoadingUpdates(false);
     }
   };

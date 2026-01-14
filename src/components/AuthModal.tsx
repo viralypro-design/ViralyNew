@@ -467,6 +467,21 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           .eq('user_id', signUpData.user.id)
           .single();
         
+        // עדכן את ה-subscription עם החבילה והתחום באמצעות RPC
+        if (selectedTrack && (selectedPlan === 'trial' || selectedPlan === 'creators')) {
+          try {
+            const { error: trackError } = await supabase.rpc('update_user_default_track', {
+              p_user_id: signUpData.user.id,
+              p_default_track: selectedTrack
+            });
+            if (trackError) {
+              console.error('Error updating default track:', trackError);
+            }
+          } catch (err) {
+            console.error('Error updating default track:', err);
+          }
+        }
+
         if (!existingSubscription) {
           // אם אין subscription, צור אותו ידנית
           const { error: subError } = await supabase
@@ -498,6 +513,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           
           if (updateError) {
             console.error('Error updating subscription:', updateError);
+            // נסה דרך RPC אם יש default_track
+            if (selectedTrack) {
+              try {
+                await supabase.rpc('update_user_default_track', {
+                  p_user_id: signUpData.user.id,
+                  p_default_track: selectedTrack
+                });
+              } catch (err) {
+                console.error('Error updating default track via RPC:', err);
+              }
+            }
           }
         }
         

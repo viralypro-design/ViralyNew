@@ -1865,7 +1865,7 @@ const App = () => {
 
   // הגדר תחום ראשוני לפי החבילה או default_track של המשתמש
   useEffect(() => {
-    if (!user || !subscription) return;
+    if (!user || !subscription || !planAccess) return;
     
     // אם יש default_track ב-subscription, השתמש בו
     if (subscription.default_track && ['actors', 'musicians', 'creators', 'influencers'].includes(subscription.default_track)) {
@@ -1873,8 +1873,8 @@ const App = () => {
       return;
     }
     
-    // אם החבילה מוגבלת לתחום אחד, ודא שאנחנו בתחום הראשון
-    if (planAccess && planAccess.maxTracks === 1 && activeTrack !== 'actors') {
+    // אם החבילה מוגבלת לתחום אחד (trial או creators) ואין default_track, הגדר את actors כברירת מחדל
+    if (planAccess.maxTracks === 1 && !subscription.default_track) {
       setActiveTrack('actors');
     }
   }, [planAccess, subscription, user]);

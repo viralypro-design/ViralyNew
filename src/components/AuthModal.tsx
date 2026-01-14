@@ -458,30 +458,51 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       }
 
       if (signUpData?.user) {
-        // בדוק אם המשתמש צריך לאמת את האימייל
-        const needsEmailConfirmation = signUpData.user.email_confirmed_at === null || 
-                                       signUpData.user.email_confirmed_at === undefined;
+        // בדוק אם יש session (אם יש, המשתמש כבר מחובר)
+        const hasSession = !!signUpData.session;
         
+        // בדוק אם המשתמש צריך לאמת את האימייל
+        const needsEmailConfirmation = !signUpData.user.email_confirmed_at;
+        
+        console.log('[AuthModal] SignUp result:', {
+          user_id: signUpData.user.id,
+          email: signUpData.user.email,
+          email_confirmed_at: signUpData.user.email_confirmed_at,
+          has_session: hasSession,
+          needs_email_confirmation: needsEmailConfirmation,
+          plan_type: selectedPlan,
+          default_track: selectedTrack
+        });
+        
+        // אם האימייל לא מאומת, לא ננסה להתחבר
         if (needsEmailConfirmation) {
           // המשתמש צריך לאמת את האימייל
-          setSuccess('המשתמש נוצר בהצלחה! אנא אמת את האימייל שלך לפני התחברות.');
+          setSuccess('המשתמש נוצר בהצלחה! אנא אמת את האימייל שלך לפני התחברות. בדוק את תיבת הדואר הנכנס שלך.');
           setError(null);
           setLoading(false);
           
-          console.log('[AuthModal] User created but needs email confirmation:', {
-            user_id: signUpData.user.id,
-            email: signUpData.user.email,
-            plan_type: selectedPlan,
-            default_track: selectedTrack
-          });
+          console.log('[AuthModal] User created but needs email confirmation - not signing in');
+          
+          // אם יש session (לא אמור לקרות אם email confirmation מופעל), נתנתק
+          if (hasSession) {
+            console.log('[AuthModal] Session exists but email not confirmed - signing out');
+            await supabase.auth.signOut();
+          }
           
           // לא ננסה להתחבר - המשתמש צריך לאמת את האימייל קודם
           // הטריגר ייצור subscription אחרי שהמשתמש יאמת את האימייל ויתחבר
           return;
         }
         
-        // אם האימייל כבר מאומת (לא אמור לקרות בדרך כלל), המשך עם התחברות
-        setSuccess('המשתמש נוצר בהצלחה! מתחבר...');
+        // אם האימייל מאומת אבל אין session, ננסה להתחבר
+        if (!hasSession) {
+          console.log('[AuthModal] Email confirmed but no session - attempting sign in...');
+          setSuccess('המשתמש נוצר בהצלחה! מתחבר...');
+        } else {
+          // אם יש session והאימייל מאומת, המשך עם התחברות
+          setSuccess('המשתמש נוצר והתחבר בהצלחה!');
+          console.log('[AuthModal] User created and already signed in');
+        }
         
         console.log('[AuthModal] User created, waiting for trigger to create subscription...', {
           user_id: signUpData.user.id,
@@ -634,12 +655,25 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         });
         
         // אם האימייל לא מאומת, לא ננסה להתחבר
-        if (signUpData.user.email_confirmed_at === null || signUpData.user.email_confirmed_at === undefined) {
+        if (!signUpData.user.email_confirmed_at) {
           setSuccess('המשתמש נוצר בהצלחה! אנא אמת את האימייל שלך ונסה להתחבר שוב.');
           setLoading(false);
           return;
         }
         
+        // אם יש כבר session (המשתמש כבר מחובר), לא צריך להתחבר שוב
+        if (signUpData.session) {
+          console.log('[AuthModal] User already has session after signup, skipping sign in');
+          setSuccess('נרשמת והתחברת בהצלחה!');
+          setTimeout(() => {
+            onSuccess();
+            onClose();
+          }, 500);
+          setLoading(false);
+          return;
+        }
+        
+        // אם אין session, ננסה להתחבר
         const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
           email: email.trim().toLowerCase(),
           password,
